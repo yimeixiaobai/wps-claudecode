@@ -153,8 +153,7 @@
 
   window.addEventListener("message", (e) => {
     if (e.data?.type === "__CC_WPS_SELECTION__") {
-      const text = e.data.text || "";
-      if (text) cachedSelection = text;
+      cachedSelection = (e.data.text || "").trim();
       if (panel.classList.contains("cc-visible")) refreshContext();
     }
   });
