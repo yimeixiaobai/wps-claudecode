@@ -180,6 +180,8 @@ app.get("/local-sessions", async (req, res) => {
           else summary = summary.slice(0, secondSentence + 1);
         }
         summary = summary.slice(0, 150);
+        // Decode project dir back to real path for cwd
+        const cwdPath = "/" + proj.replace(/-/g, "/").replace(/^\//, "");
         const project = proj.replace(/-/g, "/").replace(/^\/Users\/\w+\//, "~/");
 
         results.push({
@@ -188,6 +190,7 @@ app.get("/local-sessions", async (req, res) => {
           summary,
           turns,
           project,
+          cwd: cwdPath,
           updatedAt: fileStat.mtimeMs,
         });
       }
@@ -201,7 +204,7 @@ app.get("/local-sessions", async (req, res) => {
 });
 
 app.post("/start", (req, res) => {
-  const { request, claudeSessionId } = req.body || {};
+  const { request, claudeSessionId, claudeCwd } = req.body || {};
   if (!request) return res.status(400).json({ ok: false, error: "缺少 request 字段" });
 
   const session = createSession();
@@ -228,7 +231,9 @@ app.post("/start", (req, res) => {
   if (isResume) {
     args.push("--resume", claudeSessionId);
   }
-  const proc = spawn(CLAUDE_BIN, args, { env: process.env, shell: false, stdio: ["ignore", "pipe", "pipe"] });
+  // Use the session's original cwd so --resume can find it
+  const spawnCwd = (isResume && claudeCwd) ? claudeCwd : process.cwd();
+  const proc = spawn(CLAUDE_BIN, args, { env: process.env, shell: false, stdio: ["ignore", "pipe", "pipe"], cwd: spawnCwd });
   session.proc = proc;
 
   console.log(`${C.dim}[${session.id}] pid=${proc.pid}${C.reset}`);

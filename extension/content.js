@@ -101,7 +101,7 @@
   function makeConv(title) {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const container = createConvContainer();
-    return { id, claudeSessionId: null, title: title || "新会话", container, createdAt: Date.now() };
+    return { id, claudeSessionId: null, claudeCwd: null, title: title || "新会话", container, createdAt: Date.now() };
   }
 
   function showConv(id) {
@@ -150,7 +150,7 @@
   function persistIndex() {
     try {
       chrome.storage.local.set({ [STORAGE_KEY]: convs.map(c => ({
-        id: c.id, claudeSessionId: c.claudeSessionId, title: c.title, createdAt: c.createdAt,
+        id: c.id, claudeSessionId: c.claudeSessionId, claudeCwd: c.claudeCwd, title: c.title, createdAt: c.createdAt,
         html: c.container.innerHTML,
       }))});
     } catch (_) {}
@@ -165,7 +165,7 @@
         if (s.html) container.innerHTML = s.html;
         container.style.display = "none";
         msgsWrap.appendChild(container);
-        convs.push({ id: s.id, claudeSessionId: s.claudeSessionId, title: s.title, container, createdAt: s.createdAt });
+        convs.push({ id: s.id, claudeSessionId: s.claudeSessionId, claudeCwd: s.claudeCwd || null, title: s.title, container, createdAt: s.createdAt });
       });
     } catch (_) {}
     if (convs.length > 0) showConv(convs[0].id);
@@ -243,6 +243,7 @@
     // Create a new conversation linked to the local Claude session
     const conv = makeConv(s.title);
     conv.claudeSessionId = s.sessionId;
+    conv.claudeCwd = s.cwd || null;
     convs.unshift(conv);
     if (convs.length > MAX_SESSIONS) { const old = convs.pop(); old.container.remove(); }
     msgsWrap.appendChild(conv.container);
@@ -370,6 +371,7 @@
     const targetConvId = conv.id;
     const container = conv.container;
     const targetClaudeSession = conv.claudeSessionId;
+    const targetCwd = conv.claudeCwd;
 
     isStreaming = true; sendBtn.disabled = true; stopBtn.classList.add("cc-active");
     addUserMsg(container, text);
@@ -453,7 +455,7 @@
     try {
       const startRes = await fetch(BRIDGE + "/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request: text, url: location.href, title: document.title, selection, claudeSessionId: targetClaudeSession }),
+        body: JSON.stringify({ request: text, url: location.href, title: document.title, selection, claudeSessionId: targetClaudeSession, claudeCwd: targetCwd }),
       });
       const d = await startRes.json(); if (!d.ok) throw new Error(d.error || "启动失败");
       sessionId = d.sessionId; LOG("session:", sessionId);
