@@ -133,8 +133,8 @@ app.get("/local-sessions", async (req, res) => {
         const fileStat = await stat(filePath).catch(() => null);
         if (!fileStat) continue;
 
-        // Read first few lines to extract title and count turns
-        let title = "", turns = 0, lastAssistant = "";
+        // Extract: first user msg as title, last user msg + last assistant text as summary
+        let firstUserMsg = "", lastUserMsg = "", turns = 0, lastAssistantText = "";
         try {
           const content = await readFile(filePath, "utf-8");
           const lines = content.split("\n").filter(Boolean);
@@ -142,35 +142,51 @@ app.get("/local-sessions", async (req, res) => {
             const d = JSON.parse(line);
             if (d.type === "user") {
               turns++;
-              if (!title) {
-                const msg = d.message;
-                if (typeof msg === "object" && msg.content) {
-                  const c = Array.isArray(msg.content) ? (msg.content[0]?.text || "") : msg.content;
-                  title = c.replace(/\n/g, " ").slice(0, 80);
-                } else if (typeof msg === "string") {
-                  title = msg.slice(0, 80);
-                }
-              }
+              const msg = d.message;
+              let text = "";
+              if (typeof msg === "object" && msg.content) {
+                const c = Array.isArray(msg.content) ? (msg.content[0]?.text || "") : msg.content;
+                text = c;
+              } else if (typeof msg === "string") { text = msg; }
+              text = text.replace(/\n/g, " ").trim();
+              if (!firstUserMsg) firstUserMsg = text;
+              lastUserMsg = text;
             }
             if (d.type === "assistant" && d.message?.content) {
-              const blocks = d.message.content;
-              for (const b of blocks) {
-                if (b.type === "text" && b.text) lastAssistant = b.text;
+              for (const b of d.message.content) {
+                if (b.type === "text" && b.text) lastAssistantText = b.text;
               }
             }
           }
         } catch (_) { continue; }
 
-        if (!title || turns === 0) continue;
-        // Skip sessions that look like bridge-generated prompts
-        if (title.startsWith("我正在 WPS 365")) continue;
+        if (!firstUserMsg || turns === 0) continue;
+        if (firstUserMsg.startsWith("我正在 WPS 365")) continue;
 
-        const summary = lastAssistant.replace(/\n/g, " ").slice(0, 120);
+        // Title: first user message, truncated at first sentence boundary
+        let title = firstUserMsg;
+        const sentenceEnd = title.search(/[。？！?.!]/);
+        if (sentenceEnd > 0 && sentenceEnd < 60) title = title.slice(0, sentenceEnd + 1);
+        else title = title.slice(0, 60);
+
+        // Subtitle: last user message (if different from title)
+        const lastQ = lastUserMsg !== firstUserMsg ? lastUserMsg.slice(0, 60) : "";
+
+        // Summary: last assistant reply, first two sentences
+        let summary = lastAssistantText.replace(/\n/g, " ").trim();
+        const secondSentence = summary.search(/[。？！?.!]/);
+        if (secondSentence > 0) {
+          const afterFirst = summary.slice(secondSentence + 1).search(/[。？！?.!]/);
+          if (afterFirst > 0) summary = summary.slice(0, secondSentence + 1 + afterFirst + 1);
+          else summary = summary.slice(0, secondSentence + 1);
+        }
+        summary = summary.slice(0, 150);
         const project = proj.replace(/-/g, "/").replace(/^\/Users\/\w+\//, "~/");
 
         results.push({
           sessionId,
           title,
+          lastQuestion: lastQ,
           summary,
           turns,
           project,

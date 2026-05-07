@@ -276,6 +276,15 @@
 }
 
 /* Import items */
+.cc-sl-lastq {
+  font-size: 10px;
+  color: var(--cc-ember);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.8;
+}
 .cc-sl-meta {
   font-size: 10px;
   color: var(--cc-text-ghost);
