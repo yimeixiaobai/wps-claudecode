@@ -133,8 +133,7 @@ app.get("/local-sessions", async (req, res) => {
         const fileStat = await stat(filePath).catch(() => null);
         if (!fileStat) continue;
 
-        // Extract: first user msg as title, last user msg + last assistant text as summary
-        let firstUserMsg = "", lastUserMsg = "", turns = 0, lastAssistantText = "";
+        let firstUserMsg = "", lastUserMsg = "", turns = 0, lastAssistantText = "", sessionCwd = "";
         try {
           const content = await readFile(filePath, "utf-8");
           const lines = content.split("\n").filter(Boolean);
@@ -142,11 +141,11 @@ app.get("/local-sessions", async (req, res) => {
             const d = JSON.parse(line);
             if (d.type === "user") {
               turns++;
+              if (d.cwd && !sessionCwd) sessionCwd = d.cwd;
               const msg = d.message;
               let text = "";
               if (typeof msg === "object" && msg.content) {
                 if (Array.isArray(msg.content)) {
-                  // Find first text block (skip images etc.)
                   for (const block of msg.content) {
                     if (block.type === "text" && block.text) { text = block.text; break; }
                     if (typeof block === "string") { text = block; break; }
@@ -180,9 +179,8 @@ app.get("/local-sessions", async (req, res) => {
           else summary = summary.slice(0, secondSentence + 1);
         }
         summary = summary.slice(0, 150);
-        // Decode project dir back to real path for cwd
-        const cwdPath = "/" + proj.replace(/-/g, "/").replace(/^\//, "");
-        const project = proj.replace(/-/g, "/").replace(/^\/Users\/\w+\//, "~/");
+        const cwdPath = sessionCwd || process.cwd();
+        const project = cwdPath.replace(/^\/Users\/\w+\//, "~/");
 
         results.push({
           sessionId,
