@@ -111,6 +111,81 @@ function buildPrompt({ request, url, title, selection }) {
 // ========== Routes ==========
 app.get("/health", (_, res) => res.json({ ok: true }));
 
+// List local Claude Code sessions with titles (scans ~/.claude/projects)
+app.get("/local-sessions", async (req, res) => {
+  try {
+    const os = await import("os");
+    const fs = await import("fs");
+    const path = await import("path");
+    const { readdir, readFile, stat } = fs.promises;
+
+    const projectsDir = path.join(os.homedir(), ".claude", "projects");
+    const results = [];
+
+    const projects = await readdir(projectsDir).catch(() => []);
+    for (const proj of projects) {
+      const projPath = path.join(projectsDir, proj);
+      const files = await readdir(projPath).catch(() => []);
+      for (const file of files) {
+        if (!file.endsWith(".jsonl")) continue;
+        const sessionId = file.replace(".jsonl", "");
+        const filePath = path.join(projPath, file);
+        const fileStat = await stat(filePath).catch(() => null);
+        if (!fileStat) continue;
+
+        // Read first few lines to extract title and count turns
+        let title = "", turns = 0, lastAssistant = "";
+        try {
+          const content = await readFile(filePath, "utf-8");
+          const lines = content.split("\n").filter(Boolean);
+          for (const line of lines) {
+            const d = JSON.parse(line);
+            if (d.type === "user") {
+              turns++;
+              if (!title) {
+                const msg = d.message;
+                if (typeof msg === "object" && msg.content) {
+                  const c = Array.isArray(msg.content) ? (msg.content[0]?.text || "") : msg.content;
+                  title = c.replace(/\n/g, " ").slice(0, 80);
+                } else if (typeof msg === "string") {
+                  title = msg.slice(0, 80);
+                }
+              }
+            }
+            if (d.type === "assistant" && d.message?.content) {
+              const blocks = d.message.content;
+              for (const b of blocks) {
+                if (b.type === "text" && b.text) lastAssistant = b.text;
+              }
+            }
+          }
+        } catch (_) { continue; }
+
+        if (!title || turns === 0) continue;
+        // Skip sessions that look like bridge-generated prompts
+        if (title.startsWith("我正在 WPS 365")) continue;
+
+        const summary = lastAssistant.replace(/\n/g, " ").slice(0, 120);
+        const project = proj.replace(/-/g, "/").replace(/^\/Users\/\w+\//, "~/");
+
+        results.push({
+          sessionId,
+          title,
+          summary,
+          turns,
+          project,
+          updatedAt: fileStat.mtimeMs,
+        });
+      }
+    }
+
+    results.sort((a, b) => b.updatedAt - a.updatedAt);
+    res.json({ ok: true, sessions: results.slice(0, 30) });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 app.post("/start", (req, res) => {
   const { request, claudeSessionId } = req.body || {};
   if (!request) return res.status(400).json({ ok: false, error: "缺少 request 字段" });

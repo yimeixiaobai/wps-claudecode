@@ -162,9 +162,30 @@
   }
 
   // ========== SESSION LIST UI ==========
+  let showingImport = false;
+
   function renderSessionList() {
     sessionListEl.innerHTML = "";
-    if (convs.length === 0) { sessionListEl.innerHTML = `<div class="cc-sl-empty">暂无会话</div>`; return; }
+
+    // Tab bar: 插件会话 / 导入本地
+    const tabs = document.createElement("div");
+    tabs.className = "cc-sl-tabs";
+    tabs.innerHTML = `<span class="cc-sl-tab ${showingImport ? "" : "cc-sl-tab-active"}" data-tab="local">插件会话</span><span class="cc-sl-tab ${showingImport ? "cc-sl-tab-active" : ""}" data-tab="import">导入本地 Claude</span>`;
+    tabs.querySelector('[data-tab="local"]').addEventListener("click", () => { showingImport = false; renderSessionList(); });
+    tabs.querySelector('[data-tab="import"]').addEventListener("click", () => { showingImport = true; renderSessionList(); loadLocalSessions(); });
+    sessionListEl.appendChild(tabs);
+
+    const listWrap = document.createElement("div");
+    listWrap.className = "cc-sl-list-wrap";
+    sessionListEl.appendChild(listWrap);
+
+    if (showingImport) {
+      listWrap.innerHTML = `<div class="cc-sl-empty">加载中…</div>`;
+      return;
+    }
+
+    // Plugin conversations
+    if (convs.length === 0) { listWrap.innerHTML = `<div class="cc-sl-empty">暂无会话</div>`; return; }
     convs.forEach(c => {
       const item = document.createElement("div");
       item.className = "cc-sl-item" + (c.id === activeConvId ? " cc-sl-active" : "");
@@ -172,10 +193,64 @@
       item.innerHTML = `<div class="cc-sl-info"><div class="cc-sl-title">${esc(c.title)}</div><div class="cc-sl-time">${t.getMonth()+1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2,"0")}</div></div><button class="cc-sl-del" title="删除">×</button>`;
       item.querySelector(".cc-sl-info").addEventListener("click", () => switchToConv(c.id));
       item.querySelector(".cc-sl-del").addEventListener("click", (e) => { e.stopPropagation(); deleteConv(c.id); });
-      sessionListEl.appendChild(item);
+      listWrap.appendChild(item);
     });
   }
-  function toggleSessionList() { const v = sessionListEl.classList.contains("cc-sl-visible"); if (v) hideSessionList(); else { renderSessionList(); sessionListEl.classList.add("cc-sl-visible"); } }
+
+  async function loadLocalSessions() {
+    const listWrap = sessionListEl.querySelector(".cc-sl-list-wrap");
+    if (!listWrap) return;
+    try {
+      const r = await fetch(BRIDGE + "/local-sessions");
+      const d = await r.json();
+      if (!d.ok || !d.sessions?.length) { listWrap.innerHTML = `<div class="cc-sl-empty">未找到本地 Claude 会话</div>`; return; }
+      listWrap.innerHTML = "";
+      d.sessions.forEach(s => {
+        const item = document.createElement("div");
+        item.className = "cc-sl-item cc-sl-import";
+        const t = new Date(s.updatedAt);
+        item.innerHTML = `
+          <div class="cc-sl-info">
+            <div class="cc-sl-title">${esc(s.title)}</div>
+            <div class="cc-sl-meta">${s.turns}轮对话 · ${esc(s.project)}</div>
+            ${s.summary ? `<div class="cc-sl-summary">${esc(s.summary)}</div>` : ""}
+          </div>
+          <button class="cc-sl-import-btn">导入</button>
+        `;
+        item.querySelector(".cc-sl-import-btn").addEventListener("click", (e) => {
+          e.stopPropagation();
+          importLocalSession(s);
+        });
+        listWrap.appendChild(item);
+      });
+    } catch (err) {
+      listWrap.innerHTML = `<div class="cc-sl-empty">无法连接 Bridge</div>`;
+    }
+  }
+
+  function importLocalSession(s) {
+    // Create a new conversation linked to the local Claude session
+    const conv = makeConv(s.title);
+    conv.claudeSessionId = s.sessionId;
+    convs.unshift(conv);
+    if (convs.length > MAX_SESSIONS) { const old = convs.pop(); old.container.remove(); }
+    msgsWrap.appendChild(conv.container);
+
+    // Show a welcome-like message indicating this is imported
+    const w = conv.container.querySelector(".cc-welcome");
+    if (w) w.remove();
+    const notice = document.createElement("div");
+    notice.className = "cc-import-notice";
+    notice.innerHTML = `<strong>已导入本地会话</strong><br/>${esc(s.title)}<br/><span class="cc-text-muted">${s.turns}轮对话 · ${esc(s.project)}</span>`;
+    conv.container.appendChild(notice);
+
+    showConv(conv.id);
+    persistIndex();
+    showingImport = false;
+    LOG("imported local session:", s.sessionId);
+  }
+
+  function toggleSessionList() { const v = sessionListEl.classList.contains("cc-sl-visible"); if (v) hideSessionList(); else { showingImport = false; renderSessionList(); sessionListEl.classList.add("cc-sl-visible"); } }
   function hideSessionList() { sessionListEl.classList.remove("cc-sl-visible"); }
 
   // ========== PANEL ==========
