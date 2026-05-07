@@ -75,7 +75,6 @@
     <div class="cc-input-area">
       <div class="cc-quick-actions">
         <button class="cc-quick-btn" data-prompt="总结整篇文档要点">总结全文</button>
-        <button class="cc-quick-btn" data-prompt="翻译选中的文本为英文">翻译选中</button>
         <button class="cc-quick-btn" data-prompt="对这篇文档提出改进建议">提改进建议</button>
         <button class="cc-quick-btn" data-prompt="基于上文继续续写一段">续写</button>
       </div>
