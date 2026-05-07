@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Claude Code for WPS 365",
+  "version": "0.1.0",
+  "description": "在 WPS 365 智能文档页面内嵌入 Claude Code 入口，自动关联当前文档上下文。",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://365.kdocs.cn/*",
+    "https://www.kdocs.cn/*",
+    "http://localhost/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://365.kdocs.cn/*",
+        "https://www.kdocs.cn/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://365.kdocs.cn/*",
+        "https://www.kdocs.cn/*"
+      ],
+      "js": ["page-bridge.js"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    }
+  ]
+}
