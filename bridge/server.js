@@ -143,14 +143,14 @@ app.get("/search-docs", async (req, res) => {
     });
     const data = await r.json();
 
-    if (data.result !== "ok") return res.json({ ok: false, error: data.result || "搜索失败" });
+    if (!data.files) return res.json({ ok: false, error: data.result || data.msg || "搜索失败" });
 
     const docs = (data.files || []).map(f => ({
       id: String(f.id),
-      name: f.fname || "未命名",
+      name: (f.fname || "未命名").replace(/\.\w+$/, ""),
       type: f.ftype || "unknown",
       url: `https://365.kdocs.cn/l/${f.id}`,
-      updatedAt: (f.modify_time || 0) * 1000,
+      updatedAt: (f.mtime || f.modify_time || 0) * 1000,
     }));
     res.json({ ok: true, docs });
   } catch (err) {
