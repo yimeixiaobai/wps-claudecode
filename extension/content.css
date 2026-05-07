@@ -187,6 +187,67 @@
 
 /* Context bar hidden — selection now shown in input area */
 
+/* ────────────────── SESSION LIST ────────────────── */
+.cc-session-list {
+  display: none;
+  flex-direction: column;
+  max-height: 200px;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--cc-surface-3);
+  background: var(--cc-surface-0);
+}
+.cc-session-list.cc-sl-visible { display: flex; }
+.cc-sl-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--cc-text-ghost);
+  font-size: 12px;
+}
+.cc-sl-item {
+  display: flex;
+  align-items: center;
+  padding: 7px 12px;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.1s;
+  border-bottom: 1px solid var(--cc-surface-2);
+}
+.cc-sl-item:last-child { border-bottom: none; }
+.cc-sl-item:hover { background: var(--cc-surface-2); }
+.cc-sl-item.cc-sl-active {
+  background: var(--cc-ember-dim);
+  border-left: 3px solid var(--cc-ember);
+  padding-left: 9px;
+}
+.cc-sl-info { flex: 1; min-width: 0; }
+.cc-sl-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cc-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cc-sl-time {
+  font-size: 10px;
+  color: var(--cc-text-ghost);
+  margin-top: 1px;
+}
+.cc-sl-del {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--cc-text-ghost);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s, color 0.1s;
+}
+.cc-sl-item:hover .cc-sl-del { opacity: 1; }
+.cc-sl-del:hover { color: var(--cc-error); }
+
 /* ────────────────── MESSAGES ────────────────── */
 .cc-messages {
   flex: 1;
