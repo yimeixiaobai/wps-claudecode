@@ -208,16 +208,9 @@ app.post("/start", (req, res) => {
   const session = createSession();
   const isResume = !!claudeSessionId;
 
-  // First message: full prompt with context. Follow-up: just the user request (Claude already has context)
-  let prompt;
-  if (isResume) {
-    const parts = [];
-    if (req.body.selection) parts.push(`[用户选中的文本: "${req.body.selection}"]`);
-    parts.push(request);
-    prompt = parts.join("\n\n");
-  } else {
-    prompt = buildPrompt(req.body);
-  }
+  // Always include WPS document context — even for resumed sessions,
+  // since the original session may not know about this document.
+  const prompt = buildPrompt(req.body);
 
   console.log(`\n${C.cyan}${C.bold}━━━ [${session.id}] ${isResume ? "Continue" : "New"} Request ━━━${C.reset}`);
   if (isResume) console.log(`${C.dim}   resuming claude session: ${claudeSessionId}${C.reset}`);
