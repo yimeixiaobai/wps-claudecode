@@ -163,14 +163,11 @@ app.get("/local-sessions", async (req, res) => {
         if (!firstUserMsg || turns === 0) continue;
         if (firstUserMsg.startsWith("我正在 WPS 365")) continue;
 
-        // Title: first user message, truncated at first sentence boundary
-        let title = firstUserMsg;
+        // Title: last user message (represents current state of the conversation)
+        let title = lastUserMsg;
         const sentenceEnd = title.search(/[。？！?.!]/);
         if (sentenceEnd > 0 && sentenceEnd < 60) title = title.slice(0, sentenceEnd + 1);
         else title = title.slice(0, 60);
-
-        // Subtitle: last user message (if different from title)
-        const lastQ = lastUserMsg !== firstUserMsg ? lastUserMsg.slice(0, 60) : "";
 
         // Summary: last assistant reply, first two sentences
         let summary = lastAssistantText.replace(/\n/g, " ").trim();
@@ -186,7 +183,6 @@ app.get("/local-sessions", async (req, res) => {
         results.push({
           sessionId,
           title,
-          lastQuestion: lastQ,
           summary,
           turns,
           project,

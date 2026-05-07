@@ -212,7 +212,6 @@
         item.innerHTML = `
           <div class="cc-sl-info">
             <div class="cc-sl-title">${esc(s.title)}</div>
-            ${s.lastQuestion ? `<div class="cc-sl-lastq">最近: ${esc(s.lastQuestion)}</div>` : ""}
             <div class="cc-sl-meta">${s.turns}轮 · ${esc(s.project)}</div>
             ${s.summary ? `<div class="cc-sl-summary">${esc(s.summary)}</div>` : ""}
           </div>
