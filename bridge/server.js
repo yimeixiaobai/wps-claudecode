@@ -163,11 +163,8 @@ app.get("/local-sessions", async (req, res) => {
         if (!firstUserMsg || turns === 0) continue;
         if (firstUserMsg.startsWith("我正在 WPS 365")) continue;
 
-        // Title: last user message (represents current state of the conversation)
-        let title = lastUserMsg;
-        const sentenceEnd = title.search(/[。？！?.!]/);
-        if (sentenceEnd > 0 && sentenceEnd < 60) title = title.slice(0, sentenceEnd + 1);
-        else title = title.slice(0, 60);
+        // Title: last user message (represents current state)
+        let title = lastUserMsg.slice(0, 60);
 
         // Summary: last assistant reply, first two sentences
         let summary = lastAssistantText.replace(/\n/g, " ").trim();
@@ -192,7 +189,7 @@ app.get("/local-sessions", async (req, res) => {
     }
 
     results.sort((a, b) => b.updatedAt - a.updatedAt);
-    res.json({ ok: true, sessions: results.slice(0, 30) });
+    res.json({ ok: true, sessions: results.slice(0, 10) });
   } catch (err) {
     res.json({ ok: false, error: err.message });
   }
