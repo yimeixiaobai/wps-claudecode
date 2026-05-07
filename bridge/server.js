@@ -112,18 +112,33 @@ function buildPrompt({ request, url, title, selection }) {
 app.get("/health", (_, res) => res.json({ ok: true }));
 
 app.post("/start", (req, res) => {
-  const { request } = req.body || {};
+  const { request, claudeSessionId } = req.body || {};
   if (!request) return res.status(400).json({ ok: false, error: "缺少 request 字段" });
 
   const session = createSession();
-  const prompt = buildPrompt(req.body);
+  const isResume = !!claudeSessionId;
 
-  console.log(`\n${C.cyan}${C.bold}━━━ [${session.id}] New Request ━━━${C.reset}`);
+  // First message: full prompt with context. Follow-up: just the user request (Claude already has context)
+  let prompt;
+  if (isResume) {
+    const parts = [];
+    if (req.body.selection) parts.push(`[用户选中的文本: "${req.body.selection}"]`);
+    parts.push(request);
+    prompt = parts.join("\n\n");
+  } else {
+    prompt = buildPrompt(req.body);
+  }
+
+  console.log(`\n${C.cyan}${C.bold}━━━ [${session.id}] ${isResume ? "Continue" : "New"} Request ━━━${C.reset}`);
+  if (isResume) console.log(`${C.dim}   resuming claude session: ${claudeSessionId}${C.reset}`);
   console.log(`${C.dim}${prompt}${C.reset}\n`);
 
   pushEvent(session, { type: "status", message: "正在启动…" });
 
   const args = ["-p", prompt, "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--dangerously-skip-permissions"];
+  if (isResume) {
+    args.push("--resume", claudeSessionId);
+  }
   const proc = spawn(CLAUDE_BIN, args, { env: process.env, shell: false, stdio: ["ignore", "pipe", "pipe"] });
   session.proc = proc;
 
@@ -185,11 +200,15 @@ app.post("/start", (req, res) => {
 
   // ---- inner handler with closure over session state ----
   function handleObj(obj) {
-    // system init
+    // system init — capture Claude's session_id for conversation continuity
     if (obj.type === "system" && obj.subtype === "init") {
       const model = obj.model || "unknown";
-      console.log(`${C.blue}⚙ model=${model}${C.reset}`);
+      const clSessionId = obj.session_id || "";
+      console.log(`${C.blue}⚙ model=${model}  claude_session=${clSessionId}${C.reset}`);
       pushEvent(session, { type: "status", message: `模型: ${model}` });
+      if (clSessionId) {
+        pushEvent(session, { type: "claude_session", claudeSessionId: clSessionId });
+      }
     }
 
     // stream events

@@ -19,6 +19,7 @@
   let isStreaming = false;
   let bridgeOnline = false;
   let abortController = null;
+  let claudeSessionId = null; // Claude Code conversation session ID for --resume
 
   const ICON = {
     sparkle: `<svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" stroke="currentColor" fill="none" stroke-width="1.5"/></svg>`,
@@ -100,7 +101,11 @@
   });
   sendBtn.addEventListener("click", send);
   stopBtn.addEventListener("click", () => { if (abortController) { abortController.abort(); abortController = null; } });
-  panel.querySelector(".cc-clear-btn").addEventListener("click", () => { messagesEl.innerHTML = getWelcomeHTML(); });
+  panel.querySelector(".cc-clear-btn").addEventListener("click", () => {
+    messagesEl.innerHTML = getWelcomeHTML();
+    claudeSessionId = null;
+    LOG("session cleared");
+  });
   inputEl.addEventListener("input", () => {
     inputEl.style.height = "auto";
     inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
@@ -332,6 +337,11 @@
 
     function handleEvent(ev) {
       switch (ev.type) {
+        case "claude_session":
+          claudeSessionId = ev.claudeSessionId;
+          LOG("claude session:", claudeSessionId);
+          break;
+
         case "status":
           updateStatus(activityEl, ev.message);
           break;
@@ -445,7 +455,7 @@
     try {
       const startRes = await fetch(BRIDGE + "/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request: text, url: location.href, title: document.title, selection }),
+        body: JSON.stringify({ request: text, url: location.href, title: document.title, selection, claudeSessionId }),
       });
       const startData = await startRes.json();
       if (!startData.ok) throw new Error(startData.error || "启动失败");
