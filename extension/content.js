@@ -45,6 +45,8 @@
     claude: `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
     plus: `<svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 5v14M5 12h14" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg>`,
     list: `<svg viewBox="0 0 24 24" width="14" height="14"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg>`,
+    copy: `<svg viewBox="0 0 24 24" width="12" height="12"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" fill="none" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
+    docWrite: `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" fill="none" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
   };
 
   // ========== FAB ==========
@@ -71,6 +73,12 @@
     <div class="cc-messages-wrap"></div>
     <button class="cc-stop-btn">${ICON.stop} 停止生成</button>
     <div class="cc-input-area">
+      <div class="cc-quick-actions">
+        <button class="cc-quick-btn" data-prompt="总结整篇文档要点">总结全文</button>
+        <button class="cc-quick-btn" data-prompt="翻译选中的文本为英文">翻译选中</button>
+        <button class="cc-quick-btn" data-prompt="对这篇文档提出改进建议">提改进建议</button>
+        <button class="cc-quick-btn" data-prompt="基于上文继续续写一段">续写</button>
+      </div>
       <div class="cc-selection-bar"></div>
       <div class="cc-input-wrapper">
         <textarea class="cc-input" rows="1" placeholder="输入你的请求…"></textarea>
@@ -278,10 +286,35 @@
     if (e.altKey && (e.key === "j" || e.key === "J")) { e.preventDefault(); panel.classList.contains("cc-visible") ? hidePanel() : showPanel(); }
     if (e.key === "Escape" && panel.classList.contains("cc-visible")) hidePanel();
   });
-  inputEl.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); send(); } });
+  let inputHistory = [];
+  let historyIdx = -1;
+
+  inputEl.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); send(); return; }
+    // ↑ key recall last input (only when input is empty or at start)
+    if (e.key === "ArrowUp" && inputEl.selectionStart === 0 && inputHistory.length > 0) {
+      e.preventDefault();
+      historyIdx = Math.min(historyIdx + 1, inputHistory.length - 1);
+      inputEl.value = inputHistory[historyIdx];
+      inputEl.style.height = "auto"; inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
+    }
+    if (e.key === "ArrowDown" && historyIdx >= 0) {
+      historyIdx--;
+      inputEl.value = historyIdx >= 0 ? inputHistory[historyIdx] : "";
+      inputEl.style.height = "auto"; inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
+    }
+  });
   sendBtn.addEventListener("click", send);
   stopBtn.addEventListener("click", () => { if (abortController) { abortController.abort(); abortController = null; } });
   inputEl.addEventListener("input", () => { inputEl.style.height = "auto"; inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px"; });
+
+  // Quick action buttons
+  panel.querySelectorAll(".cc-quick-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const prompt = btn.dataset.prompt;
+      if (prompt && !isStreaming) { inputEl.value = prompt; send(); }
+    });
+  });
 
   // ========== SELECTION ==========
   const SEL_URL = chrome.runtime.getURL("inject-sel.js");
@@ -323,9 +356,26 @@
   function addAssistantMsg(container) {
     const w = container.querySelector(".cc-welcome"); if (w) w.remove();
     const m = document.createElement("div"); m.className = "cc-msg cc-msg-assistant";
-    m.innerHTML = `<div class="cc-msg-body"><div class="cc-activity"></div><div class="cc-reply"></div></div>`;
+    m.innerHTML = `<div class="cc-msg-body"><div class="cc-activity"></div><div class="cc-reply"></div></div><div class="cc-msg-actions"></div>`;
     container.appendChild(m);
-    return { activityEl: m.querySelector(".cc-activity"), replyEl: m.querySelector(".cc-reply") };
+    return { activityEl: m.querySelector(".cc-activity"), replyEl: m.querySelector(".cc-reply"), actionsEl: m.querySelector(".cc-msg-actions") };
+  }
+
+  function addMsgActions(actionsEl, replyEl) {
+    actionsEl.innerHTML = `<button class="cc-action-btn cc-copy-btn" title="复制">${ICON.copy} 复制</button><button class="cc-action-btn cc-write-btn" title="写入文档">${ICON.docWrite} 写入文档</button>`;
+    actionsEl.querySelector(".cc-copy-btn").addEventListener("click", () => {
+      const text = replyEl.innerText || replyEl.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = actionsEl.querySelector(".cc-copy-btn");
+        btn.textContent = "✓ 已复制"; setTimeout(() => { btn.innerHTML = `${ICON.copy} 复制`; }, 1500);
+      });
+    });
+    actionsEl.querySelector(".cc-write-btn").addEventListener("click", () => {
+      const text = replyEl.innerText || replyEl.textContent;
+      inputEl.value = `将以下内容追加写入当前文档末尾：\n\n${text.slice(0, 2000)}`;
+      inputEl.style.height = "auto"; inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
+      inputEl.focus();
+    });
   }
 
   function addStep(el, type, text, icon) {
@@ -373,9 +423,11 @@
     const targetClaudeSession = conv.claudeSessionId;
     const targetCwd = conv.claudeCwd;
 
+    inputHistory.unshift(text); if (inputHistory.length > 20) inputHistory.pop(); historyIdx = -1;
+
     isStreaming = true; sendBtn.disabled = true; stopBtn.classList.add("cc-active");
     addUserMsg(container, text);
-    const { activityEl, replyEl } = addAssistantMsg(container);
+    const { activityEl, replyEl, actionsEl } = addAssistantMsg(container);
     inputEl.value = ""; inputEl.style.height = "auto";
     scrollContainer(container);
 
@@ -437,8 +489,8 @@
           clearSteps(activityEl, "status"); clearSteps(activityEl, "thinking");
           if (currentToolStep) { currentToolStep.querySelector(".cc-step-icon").className = "cc-step-icon"; currentToolStep.querySelector(".cc-step-icon").textContent = "✅"; }
           if (renderFrame) { cancelAnimationFrame(renderFrame); renderFrame = null; }
-          collapseActivity(); replyEl.innerHTML = renderMarkdown(ev.result || accumulated); scroll();
-          persistIndex(); break;
+          collapseActivity(); replyEl.innerHTML = renderMarkdown(ev.result || accumulated);
+          addMsgActions(actionsEl, replyEl); scroll(); persistIndex(); break;
         case "error": {
           clearSteps(activityEl, "status"); clearSteps(activityEl, "thinking");
           if (activityEl.children.length > 0) collapseActivity();
