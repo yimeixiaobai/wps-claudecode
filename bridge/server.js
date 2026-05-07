@@ -220,7 +220,7 @@ app.post("/start", (req, res) => {
 
   const args = ["-p", prompt, "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--dangerously-skip-permissions"];
   if (isResume) {
-    args.push("--resume", claudeSessionId);
+    args.push("--resume", claudeSessionId, "--fork-session");
   }
   // Use the session's original cwd so --resume can find it
   const spawnCwd = (isResume && claudeCwd) ? claudeCwd : process.cwd();
