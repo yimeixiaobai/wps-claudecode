@@ -45,6 +45,7 @@
     claude: `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
     plus: `<svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 5v14M5 12h14" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg>`,
     list: `<svg viewBox="0 0 24 24" width="14" height="14"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg>`,
+    link: `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg>`,
     copy: `<svg viewBox="0 0 24 24" width="12" height="12"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" fill="none" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
     docWrite: `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" fill="none" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
   };
@@ -78,6 +79,7 @@
         <button class="cc-quick-btn" data-prompt="对这篇文档提出改进建议">提改进建议</button>
         <button class="cc-quick-btn" data-prompt="基于上文继续续写一段">续写</button>
       </div>
+      <div class="cc-linked-docs"></div>
       <div class="cc-selection-bar"></div>
       <div class="cc-input-wrapper">
         <textarea class="cc-input" rows="1" placeholder="输入你的请求…"></textarea>
@@ -95,6 +97,8 @@
   const stopBtn = panel.querySelector(".cc-stop-btn");
   const msgsWrap = panel.querySelector(".cc-messages-wrap");
   const selectionBar = panel.querySelector(".cc-selection-bar");
+  const linkedDocsEl = panel.querySelector(".cc-linked-docs");
+  let linkedDocs = []; // [{ url, title }]
   const sessionListEl = panel.querySelector(".cc-session-list");
 
   // ========== CONVERSATION MANAGEMENT (DOM-based, no innerHTML swap) ==========
@@ -339,6 +343,37 @@
     } else { selectionBar.innerHTML = ""; selectionBar.style.display = "none"; }
   }
 
+  // ========== LINKED DOCS ==========
+  function renderLinkedDocs() {
+    if (linkedDocs.length === 0) {
+      linkedDocsEl.innerHTML = `<button class="cc-link-add-btn">${ICON.link} 关联其他文档</button>`;
+      linkedDocsEl.querySelector(".cc-link-add-btn").addEventListener("click", promptAddDoc);
+      return;
+    }
+    let html = `<div class="cc-link-header"><span>${ICON.link} 关联文档 (${linkedDocs.length})</span><button class="cc-link-add-btn cc-link-add-small">+</button></div>`;
+    linkedDocs.forEach((doc, i) => {
+      const title = doc.title || doc.url.replace(/^https?:\/\//, "").slice(0, 40);
+      html += `<div class="cc-link-item"><span class="cc-link-title">${esc(title)}</span><button class="cc-link-rm" data-idx="${i}">×</button></div>`;
+    });
+    linkedDocsEl.innerHTML = html;
+    linkedDocsEl.querySelector(".cc-link-add-small")?.addEventListener("click", promptAddDoc);
+    linkedDocsEl.querySelectorAll(".cc-link-rm").forEach(btn => {
+      btn.addEventListener("click", () => { linkedDocs.splice(parseInt(btn.dataset.idx), 1); renderLinkedDocs(); });
+    });
+  }
+
+  function promptAddDoc() {
+    const url = prompt("输入要关联的 WPS 文档 URL：");
+    if (!url || !url.trim()) return;
+    const trimmed = url.trim();
+    if (linkedDocs.some(d => d.url === trimmed)) return;
+    const title = prompt("给这个文档起个简短名称（可留空）：") || "";
+    linkedDocs.push({ url: trimmed, title: title.trim() });
+    renderLinkedDocs();
+  }
+
+  renderLinkedDocs();
+
   // ========== HEALTH ==========
   async function checkHealth() { try { const r = await fetch(BRIDGE + "/health", { signal: AbortSignal.timeout(3000) }); bridgeOnline = !!(await r.json()).ok; } catch (_) { bridgeOnline = false; } statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline"); }
 
@@ -506,7 +541,7 @@
     try {
       const startRes = await fetch(BRIDGE + "/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request: text, url: location.href, title: document.title, selection, claudeSessionId: targetClaudeSession, claudeCwd: targetCwd }),
+        body: JSON.stringify({ request: text, url: location.href, title: document.title, selection, linkedDocs, claudeSessionId: targetClaudeSession, claudeCwd: targetCwd }),
       });
       const d = await startRes.json(); if (!d.ok) throw new Error(d.error || "启动失败");
       sessionId = d.sessionId; LOG("session:", sessionId);

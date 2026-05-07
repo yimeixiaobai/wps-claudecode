@@ -88,12 +88,18 @@ setInterval(() => {
 }, 60_000);
 
 // ========== Prompt builder ==========
-function buildPrompt({ request, url, title, selection }) {
+function buildPrompt({ request, url, title, selection, linkedDocs }) {
   const ctxLines = [];
-  if (title) ctxLines.push(`- 当前文档标题：${title}`);
-  if (url) ctxLines.push(`- 文档链接（含 file_id）：${url}`);
+  if (title) ctxLines.push(`- 当前文档（主文档）：${title}`);
+  if (url) ctxLines.push(`  链接：${url}`);
   if (selection) {
-    ctxLines.push(`- 用户在文档中选中的文本：\n  """\n  ${selection.replace(/\n/g, "\n  ")}\n  """`);
+    ctxLines.push(`- 用户选中的文本：\n  """\n  ${selection.replace(/\n/g, "\n  ")}\n  """`);
+  }
+  if (Array.isArray(linkedDocs) && linkedDocs.length > 0) {
+    ctxLines.push(`- 关联文档（可读取引用）：`);
+    linkedDocs.forEach((doc, i) => {
+      ctxLines.push(`  ${i + 1}. ${doc.title || "文档"} — ${doc.url}`);
+    });
   }
   return [
     "我正在 WPS 365 智能文档（AirPage / kdocs）中工作，请使用 WPS-AirPage-Skill 完成下面的请求。",
@@ -101,10 +107,11 @@ function buildPrompt({ request, url, title, selection }) {
     `用户请求：${request}`, "",
     "执行要求：",
     "1. 先从文档链接解析 file_id（短链由 CLI 自动解析）。",
-    "2. 如果是写操作，使用 insert-markdown / update / insert / delete 等命令；写完后用 query 回读验证。",
-    "3. 如果用户请求里有'调研''查一下''搜索'等意图，先用 WebSearch 工具收集信息，再写入文档。",
-    "4. 简洁地总结你做了什么、写到了哪里。",
-    "5. 所有思考过程和最终回复必须使用中文。",
+    "2. 如果是写操作，默认写入当前主文档；如需操作关联文档请先确认。",
+    "3. 可以从关联文档中 query 读取内容，作为参考素材写入主文档。",
+    "4. 如果用户请求里有'调研''查一下''搜索'等意图，先用 WebSearch 工具收集信息，再写入文档。",
+    "5. 简洁地总结你做了什么、写到了哪里。",
+    "6. 所有思考过程和最终回复必须使用中文。",
   ].join("\n");
 }
 
