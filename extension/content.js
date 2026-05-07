@@ -1,12 +1,7 @@
-// content.js — WPS 365 Claude Code 浮动面板（含会话管理）
+// content.js — WPS 365 Claude Code 浮动面板（会话管理 + 流式）
 (function () {
   if (window.top !== window) {
-    try {
-      document.addEventListener("copy", (e) => {
-        const text = (e.clipboardData || window.clipboardData)?.getData("text/plain");
-        if (text && text.trim() && window.top) window.top.postMessage({ type: "__CC_SELECTION__", text: text.trim() }, "*");
-      }, true);
-    } catch (_) {}
+    try { document.addEventListener("copy", (e) => { const t = (e.clipboardData || window.clipboardData)?.getData("text/plain"); if (t && t.trim() && window.top) window.top.postMessage({ type: "__CC_SELECTION__", text: t.trim() }, "*"); }, true); } catch (_) {}
     return;
   }
   if (window.__CC_WPS_INJECTED__) return;
@@ -20,10 +15,16 @@
   let isStreaming = false;
   let bridgeOnline = false;
   let abortController = null;
-  let claudeSessionId = null;
-  let currentConvId = null; // local conversation ID
-  let conversations = []; // { id, claudeSessionId, title, html, createdAt }
 
+  // ========== CONVERSATION STATE ==========
+  // Each conversation: { id, claudeSessionId, title, container (DOM element), createdAt }
+  let convs = [];
+  let activeConvId = null;
+
+  function getConv(id) { return convs.find(c => c.id === id); }
+  function activeConv() { return getConv(activeConvId); }
+
+  // ========== ICONS ==========
   const ICON = {
     sparkle: `<svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" stroke="currentColor" fill="none" stroke-width="1.5"/></svg>`,
     send: `<svg viewBox="0 0 24 24" width="16" height="16"><path d="M22 2L11 13" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" fill="none" stroke-width="2" stroke-linejoin="round"/></svg>`,
@@ -56,13 +57,7 @@
       </div>
     </div>
     <div class="cc-session-list"></div>
-    <div class="cc-messages">
-      <div class="cc-welcome">
-        <div class="cc-welcome-title">Claude Code</div>
-        <div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div>
-        <div class="cc-welcome-shortcuts"><span><kbd>Alt</kbd>+<kbd>J</kbd> 打开</span><span><kbd>⌘</kbd>+<kbd>↵</kbd> 发送</span></div>
-      </div>
-    </div>
+    <div class="cc-messages-wrap"></div>
     <button class="cc-stop-btn">${ICON.stop} 停止生成</button>
     <div class="cc-input-area">
       <div class="cc-selection-bar"></div>
@@ -80,234 +75,182 @@
   const inputEl = panel.querySelector(".cc-input");
   const sendBtn = panel.querySelector(".cc-send-btn");
   const stopBtn = panel.querySelector(".cc-stop-btn");
-  const messagesEl = panel.querySelector(".cc-messages");
+  const msgsWrap = panel.querySelector(".cc-messages-wrap");
   const selectionBar = panel.querySelector(".cc-selection-bar");
   const sessionListEl = panel.querySelector(".cc-session-list");
 
-  // ========== STORAGE ==========
-  function saveConversations() {
+  // ========== CONVERSATION MANAGEMENT (DOM-based, no innerHTML swap) ==========
+  function createConvContainer() {
+    const el = document.createElement("div");
+    el.className = "cc-messages";
+    el.innerHTML = getWelcomeHTML();
+    return el;
+  }
+
+  function makeConv(title) {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const container = createConvContainer();
+    return { id, claudeSessionId: null, title: title || "新会话", container, createdAt: Date.now() };
+  }
+
+  function showConv(id) {
+    // Hide all, show target
+    convs.forEach(c => { c.container.style.display = "none"; });
+    const conv = getConv(id);
+    if (!conv) return;
+    if (!conv.container.parentElement) msgsWrap.appendChild(conv.container);
+    conv.container.style.display = "flex";
+    activeConvId = id;
+    hideSessionList();
+  }
+
+  function newConversation() {
+    const conv = makeConv();
+    convs.unshift(conv);
+    if (convs.length > MAX_SESSIONS) {
+      const old = convs.pop();
+      old.container.remove();
+    }
+    msgsWrap.appendChild(conv.container);
+    showConv(conv.id);
+    persistIndex();
+    return conv;
+  }
+
+  function switchToConv(id) {
+    if (id === activeConvId) { hideSessionList(); return; }
+    showConv(id);
+    persistIndex();
+  }
+
+  function deleteConv(id) {
+    const conv = getConv(id);
+    if (conv) conv.container.remove();
+    convs = convs.filter(c => c.id !== id);
+    if (activeConvId === id) {
+      if (convs.length > 0) showConv(convs[0].id);
+      else newConversation();
+    }
+    persistIndex();
+    renderSessionList();
+  }
+
+  // ========== PERSISTENCE (index only — DOM containers are ephemeral) ==========
+  function persistIndex() {
     try {
-      chrome.storage.local.set({ cc_conversations: conversations.map(c => ({
-        id: c.id, claudeSessionId: c.claudeSessionId, title: c.title, html: c.html, createdAt: c.createdAt,
+      chrome.storage.local.set({ cc_convs: convs.map(c => ({
+        id: c.id, claudeSessionId: c.claudeSessionId, title: c.title, createdAt: c.createdAt,
+        html: c.container.innerHTML,
       }))});
     } catch (_) {}
   }
 
-  async function loadConversations() {
+  async function restoreIndex() {
     try {
-      const data = await chrome.storage.local.get("cc_conversations");
-      conversations = data.cc_conversations || [];
-    } catch (_) { conversations = []; }
-  }
-
-  function saveCurrentConv() {
-    if (!currentConvId) return;
-    const conv = conversations.find(c => c.id === currentConvId);
-    if (conv) {
-      conv.claudeSessionId = claudeSessionId;
-      conv.html = messagesEl.innerHTML;
-      saveConversations();
-    }
-  }
-
-  function newConversation() {
-    if (isStreaming && abortController) {
-      abortController.abort();
-      abortController = null;
-    }
-    saveCurrentConv();
-    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    const conv = { id, claudeSessionId: null, title: "新会话", html: "", createdAt: Date.now() };
-    conversations.unshift(conv);
-    if (conversations.length > MAX_SESSIONS) conversations.pop();
-    currentConvId = id;
-    claudeSessionId = null;
-    messagesEl.innerHTML = getWelcomeHTML();
-    saveConversations();
-    hideSessionList();
-  }
-
-  function switchToConv(id) {
-    if (id === currentConvId) { hideSessionList(); return; }
-    // Save current state (even if streaming — the stream keeps running in background)
-    saveCurrentConv();
-    const conv = conversations.find(c => c.id === id);
-    if (!conv) return;
-    currentConvId = conv.id;
-    claudeSessionId = conv.claudeSessionId;
-    messagesEl.innerHTML = conv.html || getWelcomeHTML();
-    rebindCollapseToggles();
-    hideSessionList();
-  }
-
-  function rebindCollapseToggles() {
-    messagesEl.querySelectorAll(".cc-activity-summary").forEach(summary => {
-      const wrap = summary.nextElementSibling;
-      if (!wrap || !wrap.classList.contains("cc-activity-details")) return;
-      summary.addEventListener("click", () => {
-        const open = wrap.style.display !== "none";
-        wrap.style.display = open ? "none" : "block";
-        summary.querySelector(".cc-summary-toggle").textContent = open ? "▶" : "▼";
+      const data = await chrome.storage.local.get("cc_convs");
+      const saved = data.cc_convs || [];
+      saved.forEach(s => {
+        const container = createConvContainer();
+        if (s.html) container.innerHTML = s.html;
+        container.style.display = "none";
+        msgsWrap.appendChild(container);
+        convs.push({ id: s.id, claudeSessionId: s.claudeSessionId, title: s.title, container, createdAt: s.createdAt });
       });
-    });
-  }
-
-  // Save a specific conversation's state by id (used by background streams)
-  function saveConvById(convId, html, csId) {
-    const conv = conversations.find(c => c.id === convId);
-    if (!conv) return;
-    conv.html = html;
-    if (csId) conv.claudeSessionId = csId;
-    saveConversations();
-    // If user is viewing this conversation, refresh the display
-    if (convId === currentConvId) {
-      messagesEl.innerHTML = html;
-      rebindCollapseToggles();
-      scrollToBottom();
-    }
-  }
-
-  function deleteConv(id) {
-    conversations = conversations.filter(c => c.id !== id);
-    if (currentConvId === id) {
-      if (conversations.length > 0) {
-        switchToConv(conversations[0].id);
-      } else {
-        newConversation();
-      }
-    }
-    saveConversations();
-    renderSessionList();
+    } catch (_) {}
+    if (convs.length > 0) showConv(convs[0].id);
+    else newConversation();
   }
 
   // ========== SESSION LIST UI ==========
   function renderSessionList() {
     sessionListEl.innerHTML = "";
-    if (conversations.length === 0) {
-      sessionListEl.innerHTML = `<div class="cc-sl-empty">暂无会话记录</div>`;
-      return;
-    }
-    conversations.forEach(c => {
+    if (convs.length === 0) { sessionListEl.innerHTML = `<div class="cc-sl-empty">暂无会话</div>`; return; }
+    convs.forEach(c => {
       const item = document.createElement("div");
-      item.className = "cc-sl-item" + (c.id === currentConvId ? " cc-sl-active" : "");
-      const time = new Date(c.createdAt);
-      const timeStr = `${time.getMonth()+1}/${time.getDate()} ${time.getHours()}:${String(time.getMinutes()).padStart(2,"0")}`;
-      item.innerHTML = `
-        <div class="cc-sl-info">
-          <div class="cc-sl-title">${esc(c.title)}</div>
-          <div class="cc-sl-time">${timeStr}</div>
-        </div>
-        <button class="cc-sl-del" title="删除">×</button>
-      `;
+      item.className = "cc-sl-item" + (c.id === activeConvId ? " cc-sl-active" : "");
+      const t = new Date(c.createdAt);
+      item.innerHTML = `<div class="cc-sl-info"><div class="cc-sl-title">${esc(c.title)}</div><div class="cc-sl-time">${t.getMonth()+1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2,"0")}</div></div><button class="cc-sl-del" title="删除">×</button>`;
       item.querySelector(".cc-sl-info").addEventListener("click", () => switchToConv(c.id));
       item.querySelector(".cc-sl-del").addEventListener("click", (e) => { e.stopPropagation(); deleteConv(c.id); });
       sessionListEl.appendChild(item);
     });
   }
-
-  function toggleSessionList() {
-    const visible = sessionListEl.classList.contains("cc-sl-visible");
-    if (visible) hideSessionList();
-    else { renderSessionList(); sessionListEl.classList.add("cc-sl-visible"); }
-  }
-
+  function toggleSessionList() { const v = sessionListEl.classList.contains("cc-sl-visible"); if (v) hideSessionList(); else { renderSessionList(); sessionListEl.classList.add("cc-sl-visible"); } }
   function hideSessionList() { sessionListEl.classList.remove("cc-sl-visible"); }
 
-  // ========== PANEL TOGGLE ==========
-  function showPanel() {
-    panel.classList.add("cc-visible");
-    requestSelection();
-    inputEl.focus();
-    checkHealth();
-  }
+  // ========== PANEL ==========
+  function showPanel() { panel.classList.add("cc-visible"); requestSelection(); inputEl.focus(); checkHealth(); }
   function hidePanel() { panel.classList.remove("cc-visible"); hideSessionList(); }
   fab.addEventListener("click", () => panel.classList.contains("cc-visible") ? hidePanel() : showPanel());
   panel.querySelector(".cc-close-btn").addEventListener("click", hidePanel);
   panel.querySelector(".cc-sessions-btn").addEventListener("click", toggleSessionList);
-  panel.querySelector(".cc-new-btn").addEventListener("click", newConversation);
+  panel.querySelector(".cc-new-btn").addEventListener("click", () => newConversation());
 
   // ========== KEYBOARD ==========
   window.addEventListener("keydown", (e) => {
     if (e.altKey && (e.key === "j" || e.key === "J")) { e.preventDefault(); panel.classList.contains("cc-visible") ? hidePanel() : showPanel(); }
     if (e.key === "Escape" && panel.classList.contains("cc-visible")) hidePanel();
   });
-  inputEl.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); send(); }
-  });
+  inputEl.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); send(); } });
   sendBtn.addEventListener("click", send);
   stopBtn.addEventListener("click", () => { if (abortController) { abortController.abort(); abortController = null; } });
-
-  inputEl.addEventListener("input", () => {
-    inputEl.style.height = "auto";
-    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
-  });
+  inputEl.addEventListener("input", () => { inputEl.style.height = "auto"; inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px"; });
 
   // ========== SELECTION ==========
   const SEL_URL = chrome.runtime.getURL("inject-sel.js");
-  function requestSelection() {
-    const s = document.createElement("script");
-    s.src = SEL_URL + "?t=" + Date.now();
-    s.onload = () => s.remove(); s.onerror = () => s.remove();
-    document.documentElement.appendChild(s);
-  }
+  function requestSelection() { const s = document.createElement("script"); s.src = SEL_URL + "?t=" + Date.now(); s.onload = () => s.remove(); s.onerror = () => s.remove(); document.documentElement.appendChild(s); }
   function waitForSelection() {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       requestSelection();
       const t = setTimeout(() => resolve(cachedSelection), 200);
-      function onMsg(e) {
-        if (e.data?.type === "__CC_SEL__") { clearTimeout(t); window.removeEventListener("message", onMsg); cachedSelection = (e.data.text || "").trim(); resolve(cachedSelection); }
-      }
+      function onMsg(e) { if (e.data?.type === "__CC_SEL__") { clearTimeout(t); window.removeEventListener("message", onMsg); cachedSelection = (e.data.text || "").trim(); resolve(cachedSelection); } }
       window.addEventListener("message", onMsg);
     });
   }
-  window.addEventListener("message", (e) => {
-    if (e.data?.type === "__CC_SEL__") { cachedSelection = (e.data.text || "").trim(); if (panel.classList.contains("cc-visible")) updateSelectionBar(); }
-  });
+  window.addEventListener("message", (e) => { if (e.data?.type === "__CC_SEL__") { cachedSelection = (e.data.text || "").trim(); if (panel.classList.contains("cc-visible")) updateSelectionBar(); } });
   document.addEventListener("mouseup", () => { if (panel.classList.contains("cc-visible")) setTimeout(requestSelection, 50); }, true);
   document.addEventListener("keyup", (e) => { if (panel.classList.contains("cc-visible") && (e.shiftKey || e.key === "Shift")) requestSelection(); }, true);
 
   function updateSelectionBar() {
     if (cachedSelection) {
-      const preview = cachedSelection.length > 60 ? cachedSelection.slice(0, 60) + "…" : cachedSelection;
-      selectionBar.innerHTML = `<span class="cc-sel-quote">↵</span><span class="cc-sel-text">${esc(preview)}</span><button class="cc-sel-clear">×</button>`;
+      const p = cachedSelection.length > 60 ? cachedSelection.slice(0, 60) + "…" : cachedSelection;
+      selectionBar.innerHTML = `<span class="cc-sel-quote">↵</span><span class="cc-sel-text">${esc(p)}</span><button class="cc-sel-clear">×</button>`;
       selectionBar.style.display = "flex";
       selectionBar.querySelector(".cc-sel-clear").addEventListener("click", () => { cachedSelection = ""; updateSelectionBar(); });
     } else { selectionBar.innerHTML = ""; selectionBar.style.display = "none"; }
   }
 
   // ========== HEALTH ==========
-  async function checkHealth() {
-    try { const r = await fetch(BRIDGE + "/health", { signal: AbortSignal.timeout(3000) }); bridgeOnline = !!(await r.json()).ok; } catch (_) { bridgeOnline = false; }
-    statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline");
+  async function checkHealth() { try { const r = await fetch(BRIDGE + "/health", { signal: AbortSignal.timeout(3000) }); bridgeOnline = !!(await r.json()).ok; } catch (_) { bridgeOnline = false; } statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline"); }
+
+  // ========== HELPERS ==========
+  function getWelcomeHTML() { return `<div class="cc-welcome"><div class="cc-welcome-title">Claude Code</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-shortcuts"><span><kbd>Alt</kbd>+<kbd>J</kbd> 打开</span><span><kbd>⌘</kbd>+<kbd>↵</kbd> 发送</span></div></div>`; }
+
+  function addUserMsg(container, text) {
+    const w = container.querySelector(".cc-welcome"); if (w) w.remove();
+    const m = document.createElement("div"); m.className = "cc-msg cc-msg-user";
+    m.innerHTML = `<div class="cc-msg-body">${esc(text)}</div>`;
+    container.appendChild(m);
   }
 
-  // ========== MESSAGES ==========
-  function getWelcomeHTML() {
-    return `<div class="cc-welcome"><div class="cc-welcome-title">Claude Code</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-shortcuts"><span><kbd>Alt</kbd>+<kbd>J</kbd> 打开</span><span><kbd>⌘</kbd>+<kbd>↵</kbd> 发送</span></div></div>`;
+  function addAssistantMsg(container) {
+    const w = container.querySelector(".cc-welcome"); if (w) w.remove();
+    const m = document.createElement("div"); m.className = "cc-msg cc-msg-assistant";
+    m.innerHTML = `<div class="cc-msg-body"><div class="cc-activity"></div><div class="cc-reply"></div></div>`;
+    container.appendChild(m);
+    return { activityEl: m.querySelector(".cc-activity"), replyEl: m.querySelector(".cc-reply") };
   }
-  function addUserMessage(text) {
-    const w = messagesEl.querySelector(".cc-welcome"); if (w) w.remove();
-    const msg = document.createElement("div"); msg.className = "cc-msg cc-msg-user";
-    msg.innerHTML = `<div class="cc-msg-body">${esc(text)}</div>`;
-    messagesEl.appendChild(msg); scrollToBottom();
-  }
-  function addAssistantMessage() {
-    const w = messagesEl.querySelector(".cc-welcome"); if (w) w.remove();
-    const msg = document.createElement("div"); msg.className = "cc-msg cc-msg-assistant";
-    msg.innerHTML = `<div class="cc-msg-body"><div class="cc-activity"></div><div class="cc-reply"></div></div>`;
-    messagesEl.appendChild(msg); scrollToBottom();
-    return { activityEl: msg.querySelector(".cc-activity"), replyEl: msg.querySelector(".cc-reply") };
-  }
+
   function addStep(el, type, text, icon) {
-    const step = document.createElement("div"); step.className = "cc-step";
-    const spinning = (type === "status" || type === "thinking" || type === "tool_start") ? " cc-spinning" : "";
+    const s = document.createElement("div"); s.className = "cc-step";
+    const spin = (type === "status" || type === "thinking" || type === "tool_start") ? " cc-spinning" : "";
     const icons = { status: "⚙", thinking: "💭", tool_start: "🔧" };
-    step.innerHTML = `<span class="cc-step-icon${spinning}">${icon || icons[type] || "•"}</span><span class="cc-step-text">${text}</span>`;
-    step.dataset.type = type; el.appendChild(step); scrollToBottom(); return step;
+    s.innerHTML = `<span class="cc-step-icon${spin}">${icon || icons[type] || "•"}</span><span class="cc-step-text">${text}</span>`;
+    s.dataset.type = type; el.appendChild(s); return s;
   }
   function updateStatus(el, msg) { const l = el.querySelector('.cc-step[data-type="status"]'); if (l) l.querySelector(".cc-step-text").textContent = msg; else addStep(el, "status", msg); }
   function clearSteps(el, type) { el.querySelectorAll(`.cc-step[data-type="${type}"]`).forEach(n => n.remove()); }
-  function scrollToBottom() { requestAnimationFrame(() => { messagesEl.scrollTop = messagesEl.scrollHeight; }); }
+  function scrollContainer(container) { requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; }); }
 
   // ========== MARKDOWN ==========
   function renderMarkdown(text) {
@@ -320,10 +263,7 @@
     p = p.replace(/^---+$/gm, "<hr/>").replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     p = p.replace(/\[([^\]]+)\]\(([^)]+)\)/g, `<a href="$2" target="_blank" rel="noopener">$1</a>`);
     p = p.replace(/^&gt;\s?(.+)$/gm, "<blockquote>$1</blockquote>");
-    p = p.replace(/^(\|.+\|)\n(\|[\s:|-]+\|)\n((?:\|.+\|\n?)+)/gm, (_, h, _s, b) => {
-      const hs = h.split("|").filter(Boolean).map(c => c.trim()); const rs = b.trim().split("\n").map(r => r.split("|").filter(Boolean).map(c => c.trim()));
-      let t = "<table><thead><tr>" + hs.map(c => `<th>${c}</th>`).join("") + "</tr></thead><tbody>"; rs.forEach(r => { t += "<tr>" + r.map(c => `<td>${c}</td>`).join("") + "</tr>"; }); return t + "</tbody></table>";
-    });
+    p = p.replace(/^(\|.+\|)\n(\|[\s:|-]+\|)\n((?:\|.+\|\n?)+)/gm, (_, h, _s, b) => { const hs = h.split("|").filter(Boolean).map(c => c.trim()); const rs = b.trim().split("\n").map(r => r.split("|").filter(Boolean).map(c => c.trim())); let t = "<table><thead><tr>" + hs.map(c => `<th>${c}</th>`).join("") + "</tr></thead><tbody>"; rs.forEach(r => { t += "<tr>" + r.map(c => `<td>${c}</td>`).join("") + "</tr>"; }); return t + "</tbody></table>"; });
     p = p.replace(/^[\s]*[-*]\s+(.+)$/gm, "<li>$1</li>").replace(/((?:<li>.*<\/li>\n?)+)/g, "<ul>$1</ul>");
     p = p.replace(/^[\s]*\d+\.\s+(.+)$/gm, "<oli>$1</oli>").replace(/((?:<oli>.*<\/oli>\n?)+)/g, m => "<ol>" + m.replace(/<\/?oli>/g, t => t.replace("oli", "li")) + "</ol>");
     const blocks = p.split(/\n{2,}/); p = blocks.map(b => { b = b.trim(); if (!b) return ""; if (/^<(h[1-6]|pre|ul|ol|table|blockquote|hr)/.test(b)) return b; return `<p>${b.replace(/\n/g, "<br/>")}</p>`; }).join("\n");
@@ -336,49 +276,38 @@
     const text = inputEl.value.trim(); if (!text) return;
     const selection = await waitForSelection();
 
-    if (!currentConvId) newConversation();
-    const targetConvId = currentConvId;
-    const targetClaudeSession = claudeSessionId;
+    // Ensure conversation exists
+    if (!activeConvId || !activeConv()) newConversation();
+    const conv = activeConv();
+    if (conv.title === "新会话") { conv.title = text.length > 30 ? text.slice(0, 30) + "…" : text; }
 
-    const conv = conversations.find(c => c.id === targetConvId);
-    if (conv && conv.title === "新会话") {
-      conv.title = text.length > 30 ? text.slice(0, 30) + "…" : text;
-      saveConversations();
-    }
+    const targetConvId = conv.id;
+    const container = conv.container;
+    const targetClaudeSession = conv.claudeSessionId;
 
     isStreaming = true; sendBtn.disabled = true; stopBtn.classList.add("cc-active");
-    addUserMessage(text);
-    const { activityEl, replyEl } = addAssistantMessage();
-    // Snapshot the container so we can save it even if user switches away
-    const msgContainer = replyEl.closest(".cc-msg-assistant").parentElement;
+    addUserMsg(container, text);
+    const { activityEl, replyEl } = addAssistantMsg(container);
     inputEl.value = ""; inputEl.style.height = "auto";
+    scrollContainer(container);
 
     let accumulated = "", gotContent = false, currentToolStep = null, sessionId = null, stopped = false, renderFrame = null;
-    const lastUserText = text; let stepCount = 0, startTime = Date.now();
-    let latestClaudeSession = targetClaudeSession;
+    let stepCount = 0, startTime = Date.now();
 
     const LABELS = { "Bash": "执行命令", "Read": "读取文件", "Write": "写入文件", "Edit": "编辑文件", "Skill": "调用技能", "WebSearch": "搜索网络", "WebFetch": "获取网页" };
     function label(n) { return LABELS[n] || (/bash/i.test(n) ? "执行命令" : /read/i.test(n) ? "读取文件" : /search/i.test(n) ? "搜索网络" : /skill/i.test(n) ? "调用技能" : n); }
+    function scroll() { scrollContainer(container); }
 
-    function isViewingTarget() { return currentConvId === targetConvId; }
-
-    function scheduleRender() {
-      if (renderFrame) return;
-      renderFrame = requestAnimationFrame(() => {
-        renderFrame = null;
-        replyEl.innerHTML = renderMarkdown(accumulated) + `<span class="cc-cursor"></span>`;
-        if (isViewingTarget()) scrollToBottom();
-      });
-    }
+    function scheduleRender() { if (renderFrame) return; renderFrame = requestAnimationFrame(() => { renderFrame = null; replyEl.innerHTML = renderMarkdown(accumulated) + `<span class="cc-cursor"></span>`; scroll(); }); }
 
     function flushTextToStep() {
       if (!accumulated.trim()) return;
       const el = document.createElement("div"); el.className = "cc-thought";
       el.textContent = accumulated.trim().length > 120 ? accumulated.trim().slice(0, 120) + "…" : accumulated.trim();
       activityEl.appendChild(el); accumulated = "";
-      if (renderFrame) { cancelAnimationFrame(renderFrame); renderFrame = null; } replyEl.innerHTML = "";
-      if (isViewingTarget()) scrollToBottom();
+      if (renderFrame) { cancelAnimationFrame(renderFrame); renderFrame = null; } replyEl.innerHTML = ""; scroll();
     }
+
     function collapseActivity() {
       if (activityEl.children.length === 0) return;
       const elapsed = Math.round((Date.now() - startTime) / 1000);
@@ -391,14 +320,9 @@
       activityEl.appendChild(summary); activityEl.appendChild(wrap);
     }
 
-    function persistConv() {
-      // Save to the target conversation, update display if user is viewing it
-      saveConvById(targetConvId, msgContainer.innerHTML, latestClaudeSession);
-    }
-
     function handleEvent(ev) {
       switch (ev.type) {
-        case "claude_session": latestClaudeSession = ev.claudeSessionId; if (isViewingTarget()) claudeSessionId = ev.claudeSessionId; LOG("claude session:", ev.claudeSessionId); break;
+        case "claude_session": { const c = getConv(targetConvId); if (c) c.claudeSessionId = ev.claudeSessionId; if (targetConvId === activeConvId) ; LOG("claude session:", ev.claudeSessionId); break; }
         case "status": updateStatus(activityEl, ev.message); break;
         case "thinking_start": clearSteps(activityEl, "status"); if (!activityEl.querySelector('.cc-step[data-type="thinking"]')) addStep(activityEl, "thinking", "思考中…"); break;
         case "thinking": break;
@@ -425,17 +349,15 @@
           clearSteps(activityEl, "status"); clearSteps(activityEl, "thinking");
           if (currentToolStep) { currentToolStep.querySelector(".cc-step-icon").className = "cc-step-icon"; currentToolStep.querySelector(".cc-step-icon").textContent = "✅"; }
           if (renderFrame) { cancelAnimationFrame(renderFrame); renderFrame = null; }
-          collapseActivity(); replyEl.innerHTML = renderMarkdown(ev.result || accumulated);
-          if (isViewingTarget()) scrollToBottom();
-          persistConv(); break;
+          collapseActivity(); replyEl.innerHTML = renderMarkdown(ev.result || accumulated); scroll();
+          persistIndex(); break;
         case "error": {
           clearSteps(activityEl, "status"); clearSteps(activityEl, "thinking");
           if (activityEl.children.length > 0) collapseActivity();
           const isTimeout = (ev.error || "").includes("超时");
           replyEl.innerHTML = `<div class="cc-error">${esc(ev.error)}</div>`;
-          if (isTimeout) { const btn = document.createElement("button"); btn.className = "cc-retry-btn"; btn.textContent = "重试"; btn.addEventListener("click", () => { messagesEl.removeChild(messagesEl.lastElementChild); messagesEl.removeChild(messagesEl.lastElementChild); inputEl.value = lastUserText; send(); }); replyEl.querySelector(".cc-error").appendChild(document.createElement("br")); replyEl.querySelector(".cc-error").appendChild(btn); }
-          if (isViewingTarget()) scrollToBottom();
-          persistConv(); break;
+          if (isTimeout) { const btn = document.createElement("button"); btn.className = "cc-retry-btn"; btn.textContent = "重试"; btn.addEventListener("click", () => { container.removeChild(container.lastElementChild); container.removeChild(container.lastElementChild); inputEl.value = text; send(); }); replyEl.querySelector(".cc-error").appendChild(document.createElement("br")); replyEl.querySelector(".cc-error").appendChild(btn); }
+          scroll(); persistIndex(); break;
         }
       }
     }
@@ -471,7 +393,7 @@
     } finally {
       if (renderFrame) cancelAnimationFrame(renderFrame);
       isStreaming = false; sendBtn.disabled = false; stopBtn.classList.remove("cc-active"); abortController = null;
-      persistConv();
+      persistIndex();
     }
   }
 
@@ -488,11 +410,5 @@
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
   // ========== INIT ==========
-  loadConversations().then(() => {
-    if (conversations.length > 0) {
-      switchToConv(conversations[0].id);
-    } else {
-      newConversation();
-    }
-  });
+  restoreIndex();
 })();
