@@ -111,6 +111,10 @@
   }
 
   function newConversation() {
+    if (isStreaming && abortController) {
+      abortController.abort();
+      abortController = null;
+    }
     saveCurrentConv();
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const conv = { id, claudeSessionId: null, title: "新会话", html: "", createdAt: Date.now() };
@@ -124,14 +128,43 @@
   }
 
   function switchToConv(id) {
-    if (isStreaming) return;
+    if (id === currentConvId) { hideSessionList(); return; }
+    // Save current state (even if streaming — the stream keeps running in background)
     saveCurrentConv();
     const conv = conversations.find(c => c.id === id);
     if (!conv) return;
     currentConvId = conv.id;
     claudeSessionId = conv.claudeSessionId;
     messagesEl.innerHTML = conv.html || getWelcomeHTML();
+    rebindCollapseToggles();
     hideSessionList();
+  }
+
+  function rebindCollapseToggles() {
+    messagesEl.querySelectorAll(".cc-activity-summary").forEach(summary => {
+      const wrap = summary.nextElementSibling;
+      if (!wrap || !wrap.classList.contains("cc-activity-details")) return;
+      summary.addEventListener("click", () => {
+        const open = wrap.style.display !== "none";
+        wrap.style.display = open ? "none" : "block";
+        summary.querySelector(".cc-summary-toggle").textContent = open ? "▶" : "▼";
+      });
+    });
+  }
+
+  // Save a specific conversation's state by id (used by background streams)
+  function saveConvById(convId, html, csId) {
+    const conv = conversations.find(c => c.id === convId);
+    if (!conv) return;
+    conv.html = html;
+    if (csId) conv.claudeSessionId = csId;
+    saveConversations();
+    // If user is viewing this conversation, refresh the display
+    if (convId === currentConvId) {
+      messagesEl.innerHTML = html;
+      rebindCollapseToggles();
+      scrollToBottom();
+    }
   }
 
   function deleteConv(id) {
@@ -303,11 +336,11 @@
     const text = inputEl.value.trim(); if (!text) return;
     const selection = await waitForSelection();
 
-    // Ensure we have a conversation
     if (!currentConvId) newConversation();
+    const targetConvId = currentConvId;
+    const targetClaudeSession = claudeSessionId;
 
-    // Update conversation title from first message
-    const conv = conversations.find(c => c.id === currentConvId);
+    const conv = conversations.find(c => c.id === targetConvId);
     if (conv && conv.title === "新会话") {
       conv.title = text.length > 30 ? text.slice(0, 30) + "…" : text;
       saveConversations();
@@ -316,21 +349,35 @@
     isStreaming = true; sendBtn.disabled = true; stopBtn.classList.add("cc-active");
     addUserMessage(text);
     const { activityEl, replyEl } = addAssistantMessage();
+    // Snapshot the container so we can save it even if user switches away
+    const msgContainer = replyEl.closest(".cc-msg-assistant").parentElement;
     inputEl.value = ""; inputEl.style.height = "auto";
 
     let accumulated = "", gotContent = false, currentToolStep = null, sessionId = null, stopped = false, renderFrame = null;
     const lastUserText = text; let stepCount = 0, startTime = Date.now();
+    let latestClaudeSession = targetClaudeSession;
 
     const LABELS = { "Bash": "执行命令", "Read": "读取文件", "Write": "写入文件", "Edit": "编辑文件", "Skill": "调用技能", "WebSearch": "搜索网络", "WebFetch": "获取网页" };
     function label(n) { return LABELS[n] || (/bash/i.test(n) ? "执行命令" : /read/i.test(n) ? "读取文件" : /search/i.test(n) ? "搜索网络" : /skill/i.test(n) ? "调用技能" : n); }
-    function scheduleRender() { if (renderFrame) return; renderFrame = requestAnimationFrame(() => { renderFrame = null; replyEl.innerHTML = renderMarkdown(accumulated) + `<span class="cc-cursor"></span>`; scrollToBottom(); }); }
+
+    function isViewingTarget() { return currentConvId === targetConvId; }
+
+    function scheduleRender() {
+      if (renderFrame) return;
+      renderFrame = requestAnimationFrame(() => {
+        renderFrame = null;
+        replyEl.innerHTML = renderMarkdown(accumulated) + `<span class="cc-cursor"></span>`;
+        if (isViewingTarget()) scrollToBottom();
+      });
+    }
 
     function flushTextToStep() {
       if (!accumulated.trim()) return;
       const el = document.createElement("div"); el.className = "cc-thought";
       el.textContent = accumulated.trim().length > 120 ? accumulated.trim().slice(0, 120) + "…" : accumulated.trim();
       activityEl.appendChild(el); accumulated = "";
-      if (renderFrame) { cancelAnimationFrame(renderFrame); renderFrame = null; } replyEl.innerHTML = ""; scrollToBottom();
+      if (renderFrame) { cancelAnimationFrame(renderFrame); renderFrame = null; } replyEl.innerHTML = "";
+      if (isViewingTarget()) scrollToBottom();
     }
     function collapseActivity() {
       if (activityEl.children.length === 0) return;
@@ -344,9 +391,14 @@
       activityEl.appendChild(summary); activityEl.appendChild(wrap);
     }
 
+    function persistConv() {
+      // Save to the target conversation, update display if user is viewing it
+      saveConvById(targetConvId, msgContainer.innerHTML, latestClaudeSession);
+    }
+
     function handleEvent(ev) {
       switch (ev.type) {
-        case "claude_session": claudeSessionId = ev.claudeSessionId; LOG("claude session:", claudeSessionId); break;
+        case "claude_session": latestClaudeSession = ev.claudeSessionId; if (isViewingTarget()) claudeSessionId = ev.claudeSessionId; LOG("claude session:", ev.claudeSessionId); break;
         case "status": updateStatus(activityEl, ev.message); break;
         case "thinking_start": clearSteps(activityEl, "status"); if (!activityEl.querySelector('.cc-step[data-type="thinking"]')) addStep(activityEl, "thinking", "思考中…"); break;
         case "thinking": break;
@@ -364,7 +416,7 @@
             let d = currentToolStep.querySelector(".cc-step-detail");
             if (!d) { d = document.createElement("div"); d.className = "cc-step-detail"; currentToolStep.appendChild(d); }
             let t = ev.text; if (t.includes("/")) t = t.replace(/\/[\w./-]+\/([\w.-]+)/g, "…/$1");
-            d.textContent = t.length > 80 ? t.slice(0, 80) + "…" : t; scrollToBottom();
+            d.textContent = t.length > 80 ? t.slice(0, 80) + "…" : t;
           } break;
         case "tool_input": break;
         case "tool_result":
@@ -373,15 +425,17 @@
           clearSteps(activityEl, "status"); clearSteps(activityEl, "thinking");
           if (currentToolStep) { currentToolStep.querySelector(".cc-step-icon").className = "cc-step-icon"; currentToolStep.querySelector(".cc-step-icon").textContent = "✅"; }
           if (renderFrame) { cancelAnimationFrame(renderFrame); renderFrame = null; }
-          collapseActivity(); replyEl.innerHTML = renderMarkdown(ev.result || accumulated); scrollToBottom();
-          saveCurrentConv(); break;
+          collapseActivity(); replyEl.innerHTML = renderMarkdown(ev.result || accumulated);
+          if (isViewingTarget()) scrollToBottom();
+          persistConv(); break;
         case "error": {
           clearSteps(activityEl, "status"); clearSteps(activityEl, "thinking");
           if (activityEl.children.length > 0) collapseActivity();
           const isTimeout = (ev.error || "").includes("超时");
           replyEl.innerHTML = `<div class="cc-error">${esc(ev.error)}</div>`;
           if (isTimeout) { const btn = document.createElement("button"); btn.className = "cc-retry-btn"; btn.textContent = "重试"; btn.addEventListener("click", () => { messagesEl.removeChild(messagesEl.lastElementChild); messagesEl.removeChild(messagesEl.lastElementChild); inputEl.value = lastUserText; send(); }); replyEl.querySelector(".cc-error").appendChild(document.createElement("br")); replyEl.querySelector(".cc-error").appendChild(btn); }
-          scrollToBottom(); saveCurrentConv(); break;
+          if (isViewingTarget()) scrollToBottom();
+          persistConv(); break;
         }
       }
     }
@@ -391,7 +445,7 @@
     try {
       const startRes = await fetch(BRIDGE + "/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request: text, url: location.href, title: document.title, selection, claudeSessionId }),
+        body: JSON.stringify({ request: text, url: location.href, title: document.title, selection, claudeSessionId: targetClaudeSession }),
       });
       const d = await startRes.json(); if (!d.ok) throw new Error(d.error || "启动失败");
       sessionId = d.sessionId; LOG("session:", sessionId);
@@ -417,7 +471,7 @@
     } finally {
       if (renderFrame) cancelAnimationFrame(renderFrame);
       isStreaming = false; sendBtn.disabled = false; stopBtn.classList.remove("cc-active"); abortController = null;
-      saveCurrentConv();
+      persistConv();
     }
   }
 
