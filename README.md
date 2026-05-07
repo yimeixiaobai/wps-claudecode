@@ -1,29 +1,49 @@
 # Claude Code × WPS 智能文档
 
-在 WPS 365 智能文档页面里嵌入一个 Claude Code 入口。用户只管写自然语言诉求，扩展自动把当前文档 URL、选区和标题作为上下文送出。
+在 WPS 365 智能文档页面里嵌入 Claude Code 浮动面板。用户用自然语言描述需求，插件自动关联当前文档上下文（标题、URL、选区），通过本地 Bridge 调用 Claude Code CLI 完成文档读写操作。
+
+## 架构
+
+```
+WPS 365 页面 (365.kdocs.cn)
+├── content.js (isolated world) — 浮动面板 UI、polling、会话管理
+├── inject-sel.js (MAIN world, 按需注入) — 读取 ProseMirror 编辑器选区
+│
+│  ← HTTP (polling) →
+│
+└── bridge/server.js (本地 Node.js)
+    ├── POST /start — 启动 claude CLI 子进程，返回 session ID
+    ├── GET /poll/:id — 轮询获取流式事件（delta、tool_start、done 等）
+    ├── POST /stop/:id — 中止 claude 进程
+    └── GET /local-sessions — 列出本地 Claude Code 会话（供导入）
+```
+
+**为什么用 polling 而不是 SSE/WebSocket？**
+WPS 页面的网络环境会中断长连接（Service Worker / 混合内容策略），polling 模式用短连接 JSON 响应，100% 可靠。
 
 ## 目录结构
 
 ```
 wps-cc/
-├── extension/        ← Chrome 扩展（注入悬浮按钮和输入面板）
+├── extension/          ← Chrome/Edge 扩展
 │   ├── manifest.json
-│   ├── content.js
-│   └── content.css
-└── bridge/           ← 本地 Node.js 服务（接收扩展请求，调 claude）
+│   ├── content.js      ← 面板 UI + 会话管理 + polling
+│   ├── content.css     ← 样式（Obsidian Ember 主题）
+│   └── inject-sel.js   ← 按需注入到页面读取 WPS 编辑器选区
+└── bridge/             ← 本地 Node.js 服务
     ├── package.json
-    └── server.js
+    └── server.js       ← Express 服务 + Claude CLI 子进程管理
 ```
 
-## 一次性准备
-
-前置：
+## 前置要求
 
 - Node.js 18+
-- Claude Code CLI（命令行能跑通 `claude --version`）
-- 已装好 WPS-AirPage-Skill：`npx skills add WPS-SMARTDOCS/WPS-AIRPAGE-SKILL`，并在 Claude Code 里完成首次浏览器登录鉴权。
+- Claude Code CLI（`claude --version` 可用）
+- WPS-AirPage-Skill 已安装：`npx skills add WPS-SMARTDOCS/WPS-AIRPAGE-SKILL`
 
-## 启动 Bridge
+## 快速开始
+
+### 1. 启动 Bridge
 
 ```bash
 cd bridge
@@ -32,63 +52,60 @@ npm start
 # ✅ Bridge listening on http://localhost:5174
 ```
 
-可选环境变量：
+### 2. 安装扩展
 
-- `PORT`：监听端口，默认 `5174`（如改了，记得同步改 extension/content.js 里的 BRIDGE_URL）
-- `CLAUDE_BIN`：claude 可执行文件的路径，默认从 PATH 找
-- `CC_TIMEOUT_MS`：单次请求超时，默认 5 分钟
+1. 打开 `chrome://extensions`（或 `edge://extensions`）
+2. 开启「开发者模式」
+3. 点「加载已解压的扩展程序」→ 选 `extension/` 文件夹
+4. 打开 WPS 365 文档，右下角出现橘色 CC 按钮
 
-## 安装扩展
+### 3. 使用
 
-1. 打开 Chrome → 访问 `chrome://extensions`
-2. 右上角打开"开发者模式"
-3. 点"加载已解压的扩展程序" → 选中 `extension/` 文件夹
-4. 打开任意 WPS 365 文档（`365.kdocs.cn/...`），右下角应出现黑色圆形 **CC** 按钮
+- 点 **CC 按钮** 或按 **Alt+J** 打开面板
+- 在文档中选中文字，面板输入框上方自动显示选区引用
+- 输入请求，按 **⌘/Ctrl+Enter** 发送
+- 实时看到工具调用步骤 → 流式文字输出 → 完成后自动折叠步骤摘要
 
-## 用法
+## 核心功能
 
-- 点右下角 **CC** 按钮，或按 `Alt+J` 打开输入面板
-- 上下文区会显示当前文档标题、URL 和选中文本（如有）
-- 输入诉求，按"发送"或 `Cmd/Ctrl + Enter`
+### 文档选区捕获
+WPS 编辑器是 ProseMirror 架构，标准 `window.getSelection()` 不可用。插件通过按需注入 `inject-sel.js` 到页面主世界，调用 `APP.core.editor.state.doc.textBetween(from, to)` 读取选区，避免持久驻留 MAIN world 导致内存泄漏。
 
-示例诉求：
+### 流式输出 + 中间过程
+Bridge 解析 Claude CLI 的 `stream-json` 输出，转换为前端事件：
+- `status` — 启动/等待/回复中
+- `thinking_start/done` — 深度思考指示
+- `tool_start/detail/result` — 工具调用步骤（中文标签 + 描述）
+- `delta` — 文字增量流式渲染
+- `done` — 完成，步骤自动折叠为摘要
 
-| 类型 | 写法 |
-|---|---|
-| 内容编辑 | "把第二段改写得更正式" |
-| 总结 | "总结整篇文档要点，写到文末" |
-| 调研 + 写入 | "调研一下国内主流的 RAG 开源框架，整理成表格插入到末尾" |
-| 局部润色 | （选中一段后）"把这段改成更口语化的表达，并替换原文" |
-| 评审 | "对这份文档逐段提改进建议，作为评论加上去" |
+### 多轮会话
+利用 Claude CLI 的 `--resume <session_id>` 机制：
+- 同一会话内多条消息共享上下文
+- 清空对话 → 开启新 session
+- 每个文档的会话独立隔离
 
-## 工作原理
+### 导入本地 Claude Code 会话
+从 `~/.claude/projects/` 扫描本地 session 文件，提取标题和摘要，用户通过列表选择导入。使用 `--fork-session` 创建分支，不干扰终端正在运行的 session。
 
-1. **扩展** 抓取 `location.href`、`document.title`、`window.getSelection().toString()`
-2. **Bridge** 把这些拼成 prompt，启动 `claude -p "<prompt>"` 子进程
-3. **Claude Code** 看到 prompt 里的 `kdocs / AirPage / 智能文档` 关键词，自动激活 **WPS-AirPage-Skill**
-4. **Skill** 解析 URL → file_id，用 CLI 命令完成读 / 写 / 评论操作
-5. WPS 365 协同编辑机制让用户当前打开的页面**自动同步**最新内容，不用刷新
+## 环境变量
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `PORT` | `5174` | Bridge 监听端口 |
+| `CLAUDE_BIN` | `claude` | Claude CLI 路径 |
+| `CC_TIMEOUT_MS` | `600000` (10分钟) | 单次请求超时 |
 
 ## 常见问题
 
-**Q: 点了发送，提示"无法连接本地 Bridge"？**
-A: Bridge 没启动或端口被占用。`curl http://localhost:5174/health` 自检。
+**Q: 点发送后提示「无法连接 Bridge」？**
+Bridge 没启动。运行 `cd bridge && npm start`。
 
-**Q: Bridge 报"无法启动 claude"？**
-A: claude 不在 PATH 里。用 `which claude` 找到绝对路径，启动时设环境变量：
-`CLAUDE_BIN=/full/path/to/claude npm start`
+**Q: 选区捕获不到？**
+确认在文档编辑区域选中了文字（非面板内部）。WPS 编辑器需要通过 ProseMirror API 读取。
 
-**Q: Claude 反馈"鉴权失败"？**
-A: AirPage Skill 的 cookie 过期了。在终端跑一次 `node ~/.claude/skills/WPS-AirPage-Skill/scripts/cli.js auth --browser` 重新登录。
+**Q: 导入本地会话后报错「No conversation found」？**
+Session 文件可能已过期或被清理。尝试导入更近期的会话。
 
-**Q: 选中文本捕获不到？**
-A: WPS 部分编辑器组件用了 shadow DOM 或自定义选区。先在文档里复制一下选中内容，再把它粘到输入框里也是个稳妥的兜底。
-
-**Q: 想流式看 Claude 的中间过程？**
-A: 把 server.js 里的 `--output-format text` 改成 `stream-json`，在 Bridge 里用 SSE 推到扩展，扩展那边把 `cc-output` 改成增量渲染即可。这版起步模板没做，避免一开始太复杂。
-
-## 进阶方向
-
-- **写到 WPS 三方应用** 而不是浏览器扩展：通过 WPS 开放平台的"自定义元素 / 三方应用"机制，把这个面板做成文档原生组件，团队成员开箱即用。需要走金山的应用审核。
-- **对接更多 Skill**：同一个 Bridge 也可以服务 dbsheet / 多维表格 等其他 WPS 模块，prompt 里换关键词即可触发对应 Skill。
-- **会话连续性**：默认每次请求是独立 session。可以在 Bridge 里维护 sessionId，调 `claude -p --continue` 串起来，让用户能"基于刚才那次再调一下"。
+**Q: 内存占用过高？**
+正常情况下 WPS 页面约 1-2 GB。如果超过 3 GB，检查是否打开了 DevTools（DevTools 自身会占用大量内存）。

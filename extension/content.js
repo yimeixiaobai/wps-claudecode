@@ -460,24 +460,44 @@
       const d = await startRes.json(); if (!d.ok) throw new Error(d.error || "启动失败");
       sessionId = d.sessionId; LOG("session:", sessionId);
 
-      let cursor = 0, polls = 0;
+      let cursor = 0, polls = 0, consecutiveErrors = 0;
       while (!stopped) {
         await sleep(200); if (stopped) break;
         try {
           const r = await fetch(BRIDGE + "/poll/" + sessionId + "?cursor=" + cursor);
-          const p = await r.json(); if (!p.ok) break; polls++;
+          const p = await r.json(); if (!p.ok) break;
+          polls++; consecutiveErrors = 0;
           for (const ev of p.events) {
             if (ev.type === "close" || ev.type === "done" || ev.type === "error") stopped = true;
             try { handleEvent(ev); } catch (e) { LOG("event error:", e); }
             if (stopped) break;
           }
           cursor = p.cursor; if (p.done || stopped) break;
-        } catch (e) { LOG("poll error:", e.message); }
+        } catch (e) {
+          consecutiveErrors++;
+          LOG("poll error:", e.message, `(${consecutiveErrors}/5)`);
+          if (consecutiveErrors >= 5) {
+            // Bridge is down — show reconnect error
+            clearSteps(activityEl, "status"); clearSteps(activityEl, "thinking");
+            replyEl.innerHTML = `<div class="cc-error">Bridge 连接中断，请检查 bridge 是否在运行</div>`;
+            const retryBtn = document.createElement("button");
+            retryBtn.className = "cc-retry-btn"; retryBtn.textContent = "重试";
+            retryBtn.addEventListener("click", () => {
+              container.removeChild(container.lastElementChild);
+              container.removeChild(container.lastElementChild);
+              inputEl.value = text; send();
+            });
+            replyEl.querySelector(".cc-error").appendChild(document.createElement("br"));
+            replyEl.querySelector(".cc-error").appendChild(retryBtn);
+            stopped = true; scroll(); break;
+          }
+          await sleep(1000); // back off before retry
+        }
       }
       LOG("stopped after", polls, "polls");
       if (accumulated && !replyEl.querySelector(".cc-md") && !replyEl.querySelector(".cc-error")) replyEl.innerHTML = renderMarkdown(accumulated);
     } catch (err) {
-      replyEl.innerHTML = `<div class="cc-error">无法连接 Bridge<br/>${esc(err.message)}</div>`;
+      replyEl.innerHTML = `<div class="cc-error">无法连接 Bridge，请确认已运行 <code>cd bridge && npm start</code></div>`;
     } finally {
       if (renderFrame) cancelAnimationFrame(renderFrame);
       isStreaming = false; sendBtn.disabled = false; stopBtn.classList.remove("cc-active"); abortController = null;
