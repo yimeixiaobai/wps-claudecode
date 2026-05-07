@@ -145,12 +145,17 @@ app.get("/local-sessions", async (req, res) => {
               const msg = d.message;
               let text = "";
               if (typeof msg === "object" && msg.content) {
-                const c = Array.isArray(msg.content) ? (msg.content[0]?.text || "") : msg.content;
-                text = c;
+                if (Array.isArray(msg.content)) {
+                  // Find first text block (skip images etc.)
+                  for (const block of msg.content) {
+                    if (block.type === "text" && block.text) { text = block.text; break; }
+                    if (typeof block === "string") { text = block; break; }
+                  }
+                } else if (typeof msg.content === "string") { text = msg.content; }
               } else if (typeof msg === "string") { text = msg; }
               text = text.replace(/\n/g, " ").trim();
-              if (!firstUserMsg) firstUserMsg = text;
-              lastUserMsg = text;
+              if (text && !firstUserMsg) firstUserMsg = text;
+              if (text) lastUserMsg = text;
             }
             if (d.type === "assistant" && d.message?.content) {
               for (const b of d.message.content) {
