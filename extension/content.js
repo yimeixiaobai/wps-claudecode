@@ -343,33 +343,65 @@
     } else { selectionBar.innerHTML = ""; selectionBar.style.display = "none"; }
   }
 
-  // ========== LINKED DOCS ==========
+  // ========== LINKED DOCS (with search) ==========
+  let linkSearchTimer = null;
+
   function renderLinkedDocs() {
-    if (linkedDocs.length === 0) {
-      linkedDocsEl.innerHTML = `<button class="cc-link-add-btn">${ICON.link} 关联其他文档</button>`;
-      linkedDocsEl.querySelector(".cc-link-add-btn").addEventListener("click", promptAddDoc);
-      return;
+    linkedDocsEl.innerHTML = "";
+    // Existing linked docs
+    if (linkedDocs.length > 0) {
+      const header = document.createElement("div");
+      header.className = "cc-link-header";
+      header.innerHTML = `<span>${ICON.link} 关联文档 (${linkedDocs.length})</span>`;
+      linkedDocsEl.appendChild(header);
+      linkedDocs.forEach((doc, i) => {
+        const item = document.createElement("div");
+        item.className = "cc-link-item";
+        item.innerHTML = `<span class="cc-link-title">${esc(doc.title || doc.url)}</span><button class="cc-link-rm">×</button>`;
+        item.querySelector(".cc-link-rm").addEventListener("click", () => { linkedDocs.splice(i, 1); renderLinkedDocs(); });
+        linkedDocsEl.appendChild(item);
+      });
     }
-    let html = `<div class="cc-link-header"><span>${ICON.link} 关联文档 (${linkedDocs.length})</span><button class="cc-link-add-btn cc-link-add-small">+</button></div>`;
-    linkedDocs.forEach((doc, i) => {
-      const title = doc.title || doc.url.replace(/^https?:\/\//, "").slice(0, 40);
-      html += `<div class="cc-link-item"><span class="cc-link-title">${esc(title)}</span><button class="cc-link-rm" data-idx="${i}">×</button></div>`;
-    });
-    linkedDocsEl.innerHTML = html;
-    linkedDocsEl.querySelector(".cc-link-add-small")?.addEventListener("click", promptAddDoc);
-    linkedDocsEl.querySelectorAll(".cc-link-rm").forEach(btn => {
-      btn.addEventListener("click", () => { linkedDocs.splice(parseInt(btn.dataset.idx), 1); renderLinkedDocs(); });
+    // Search input
+    const searchWrap = document.createElement("div");
+    searchWrap.className = "cc-link-search-wrap";
+    searchWrap.innerHTML = `<input class="cc-link-search" placeholder="搜索文档名称关联…" /><div class="cc-link-results"></div>`;
+    linkedDocsEl.appendChild(searchWrap);
+
+    const searchInput = searchWrap.querySelector(".cc-link-search");
+    const resultsEl = searchWrap.querySelector(".cc-link-results");
+
+    // Load recent docs on focus
+    searchInput.addEventListener("focus", () => { if (!searchInput.value.trim()) searchDocs("", resultsEl); });
+    searchInput.addEventListener("input", () => {
+      clearTimeout(linkSearchTimer);
+      linkSearchTimer = setTimeout(() => searchDocs(searchInput.value.trim(), resultsEl), 300);
     });
   }
 
-  function promptAddDoc() {
-    const url = prompt("输入要关联的 WPS 文档 URL：");
-    if (!url || !url.trim()) return;
-    const trimmed = url.trim();
-    if (linkedDocs.some(d => d.url === trimmed)) return;
-    const title = prompt("给这个文档起个简短名称（可留空）：") || "";
-    linkedDocs.push({ url: trimmed, title: title.trim() });
-    renderLinkedDocs();
+  async function searchDocs(q, resultsEl) {
+    resultsEl.innerHTML = `<div class="cc-link-loading">搜索中…</div>`;
+    try {
+      const r = await fetch(BRIDGE + "/search-docs?q=" + encodeURIComponent(q));
+      const d = await r.json();
+      if (!d.ok || !d.docs?.length) { resultsEl.innerHTML = `<div class="cc-link-loading">${q ? "未找到" : "暂无最近文档"}</div>`; return; }
+      resultsEl.innerHTML = "";
+      d.docs.forEach(doc => {
+        if (linkedDocs.some(ld => ld.url === doc.url)) return; // skip already linked
+        const item = document.createElement("div");
+        item.className = "cc-link-result";
+        const t = doc.updatedAt ? new Date(doc.updatedAt) : null;
+        const timeStr = t ? `${t.getMonth()+1}/${t.getDate()}` : "";
+        item.innerHTML = `<span class="cc-link-result-name">${esc(doc.name)}</span><span class="cc-link-result-meta">${esc(doc.type)} ${timeStr}</span>`;
+        item.addEventListener("click", () => {
+          linkedDocs.push({ url: doc.url, title: doc.name });
+          renderLinkedDocs();
+        });
+        resultsEl.appendChild(item);
+      });
+    } catch (e) {
+      resultsEl.innerHTML = `<div class="cc-link-loading">连接失败</div>`;
+    }
   }
 
   renderLinkedDocs();

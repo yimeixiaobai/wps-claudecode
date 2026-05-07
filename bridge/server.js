@@ -115,8 +115,48 @@ function buildPrompt({ request, url, title, selection, linkedDocs }) {
   ].join("\n");
 }
 
+// ========== WPS Doc Search ==========
+async function getWpsCookie() {
+  const os = await import("os");
+  const fs = await import("fs");
+  const path = await import("path");
+  const secretPath = path.join(os.homedir(), ".claude", "secrets", "wps365.json");
+  const data = JSON.parse(await fs.promises.readFile(secretPath, "utf-8"));
+  return data.cookie || "";
+}
+
 // ========== Routes ==========
 app.get("/health", (_, res) => res.json({ ok: true }));
+
+// Search WPS docs by keyword, or list recent docs (no keyword)
+app.get("/search-docs", async (req, res) => {
+  try {
+    const keyword = req.query.q || "";
+    const cookie = await getWpsCookie();
+    if (!cookie) return res.json({ ok: false, error: "WPS cookie 未配置" });
+
+    const params = new URLSearchParams({ offset: "0", count: "10", sort_by: "modify_time", order: "desc" });
+    if (keyword) params.set("searchname", keyword);
+
+    const r = await fetch(`https://365.kdocs.cn/3rd/drive/api/v6/search/files?${params}`, {
+      headers: { Cookie: cookie },
+    });
+    const data = await r.json();
+
+    if (data.result !== "ok") return res.json({ ok: false, error: data.result || "搜索失败" });
+
+    const docs = (data.files || []).map(f => ({
+      id: String(f.id),
+      name: f.fname || "未命名",
+      type: f.ftype || "unknown",
+      url: `https://365.kdocs.cn/l/${f.id}`,
+      updatedAt: (f.modify_time || 0) * 1000,
+    }));
+    res.json({ ok: true, docs });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
 
 // List local Claude Code sessions with titles (scans ~/.claude/projects)
 app.get("/local-sessions", async (req, res) => {
