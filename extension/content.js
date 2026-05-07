@@ -16,6 +16,17 @@
   let bridgeOnline = false;
   let abortController = null;
 
+  // ========== DOCUMENT ID (for per-document conversation isolation) ==========
+  const docId = (() => {
+    const m = location.pathname.match(/\/l\/([A-Za-z0-9]+)/);
+    if (m) return m[1];
+    const m2 = location.pathname.match(/\/(\d+)\//);
+    if (m2) return m2[1];
+    return location.pathname.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 40);
+  })();
+  const STORAGE_KEY = "cc_convs_" + docId;
+  LOG("doc isolation key:", docId);
+
   // ========== CONVERSATION STATE ==========
   // Each conversation: { id, claudeSessionId, title, container (DOM element), createdAt }
   let convs = [];
@@ -138,7 +149,7 @@
   // ========== PERSISTENCE (index only — DOM containers are ephemeral) ==========
   function persistIndex() {
     try {
-      chrome.storage.local.set({ cc_convs: convs.map(c => ({
+      chrome.storage.local.set({ [STORAGE_KEY]: convs.map(c => ({
         id: c.id, claudeSessionId: c.claudeSessionId, title: c.title, createdAt: c.createdAt,
         html: c.container.innerHTML,
       }))});
@@ -147,8 +158,8 @@
 
   async function restoreIndex() {
     try {
-      const data = await chrome.storage.local.get("cc_convs");
-      const saved = data.cc_convs || [];
+      const data = await chrome.storage.local.get(STORAGE_KEY);
+      const saved = data[STORAGE_KEY] || [];
       saved.forEach(s => {
         const container = createConvContainer();
         if (s.html) container.innerHTML = s.html;
