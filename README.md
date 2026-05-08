@@ -45,12 +45,16 @@ wps-cc/
 
 ### 1. 启动 Bridge
 
+**方式 A（推荐）：** 在 Finder 中双击 `bridge/start-bridge.command`
+
+**方式 B（终端）：**
 ```bash
-cd bridge
-npm install
-npm start
-# ✅ Bridge listening on http://localhost:5174
+cd bridge && npm install && npm start
 ```
+
+> 停止：关闭终端窗口，或双击 `bridge/stop-bridge.command`
+>
+> 首次双击 `.command` 文件如果被 macOS 拦截，右键 → 打开 即可。
 
 ### 2. 安装扩展
 
