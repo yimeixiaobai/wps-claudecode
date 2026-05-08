@@ -18,6 +18,7 @@
   const MAX_SESSIONS = 20;
 
   let cachedSelection = "";
+  let dismissedSelection = "";
   let isStreaming = false;
   let bridgeOnline = false;
   let abortController = null;
@@ -55,6 +56,7 @@
     link: `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg>`,
     copy: `<svg viewBox="0 0 24 24" width="12" height="12"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" fill="none" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
     docWrite: `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" fill="none" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
+    quote: `<svg viewBox="0 0 16 16" width="13" height="13"><path d="M4 2v3a6 6 0 006 6h2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 9l2 2-2 2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   };
 
   // ========== FAB ==========
@@ -81,11 +83,7 @@
     <div class="cc-messages-wrap"></div>
     <button class="cc-stop-btn">${ICON.stop} 停止生成</button>
     <div class="cc-input-area">
-      <div class="cc-quick-actions">
-        <button class="cc-quick-btn" data-prompt="总结整篇文档要点">总结全文</button>
-        <button class="cc-quick-btn" data-prompt="对这篇文档提出改进建议">提改进建议</button>
-        <button class="cc-quick-btn" data-prompt="基于上文继续续写一段">续写</button>
-      </div>
+      <div class="cc-quick-actions"></div>
       <div class="cc-linked-docs"></div>
       <div class="cc-selection-bar"></div>
       <div class="cc-input-wrapper">
@@ -338,13 +336,9 @@
   stopBtn.addEventListener("click", () => { if (abortController) { abortController.abort(); abortController = null; } });
   inputEl.addEventListener("input", () => { inputEl.style.height = "auto"; inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px"; });
 
-  // Quick action buttons
-  panel.querySelectorAll(".cc-quick-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const prompt = btn.dataset.prompt;
-      if (prompt && !isStreaming) { inputEl.value = prompt; send(); }
-    });
-  });
+  // Quick action buttons (dynamic based on selection)
+  updateQuickActions();
+  updatePlaceholder();
 
   // ========== SELECTION ==========
   const SEL_URL = chrome.runtime.getURL("inject-sel.js");
@@ -357,48 +351,73 @@
       window.addEventListener("message", onMsg);
     });
   }
-  window.addEventListener("message", (e) => { if (e.data?.type === "__CC_SEL__") { cachedSelection = (e.data.text || "").trim(); if (panel.classList.contains("cc-visible")) updateSelectionBar(); } });
+  window.addEventListener("message", (e) => {
+    if (e.data?.type === "__CC_SEL__") {
+      const text = (e.data.text || "").trim();
+      if (text && text === dismissedSelection) return;
+      dismissedSelection = "";
+      cachedSelection = text;
+      if (panel.classList.contains("cc-visible")) updateSelectionBar();
+    }
+  });
   document.addEventListener("mouseup", () => { if (panel.classList.contains("cc-visible")) setTimeout(requestSelection, 50); }, true);
   document.addEventListener("keyup", (e) => { if (panel.classList.contains("cc-visible") && (e.shiftKey || e.key === "Shift")) requestSelection(); }, true);
 
   function updateSelectionBar() {
     if (cachedSelection) {
       const p = cachedSelection.length > 60 ? cachedSelection.slice(0, 60) + "…" : cachedSelection;
-      selectionBar.innerHTML = `<span class="cc-sel-quote">↵</span><span class="cc-sel-text">${esc(p)}</span><button class="cc-sel-clear">×</button>`;
+      selectionBar.innerHTML = `<span class="cc-sel-quote">${ICON.quote}</span><span class="cc-sel-text">${esc(p)}</span><button class="cc-sel-clear">×</button>`;
       selectionBar.style.display = "flex";
-      selectionBar.querySelector(".cc-sel-clear").addEventListener("click", () => { cachedSelection = ""; updateSelectionBar(); });
+      selectionBar.querySelector(".cc-sel-clear").addEventListener("click", () => { dismissedSelection = cachedSelection; cachedSelection = ""; updateSelectionBar(); });
     } else { selectionBar.innerHTML = ""; selectionBar.style.display = "none"; }
+    updateQuickActions();
+    updatePlaceholder();
+  }
+
+  function updateQuickActions() {
+    const quickEl = panel.querySelector(".cc-quick-actions");
+    const actions = cachedSelection
+      ? [{ label: "解释选中", prompt: "解释一下选中的这段内容" }, { label: "改写润色", prompt: "帮我改写润色选中的这段文字，使其更通顺、专业" }, { label: "扩写这段", prompt: "基于选中的内容，在文档中扩展补充这一段" }]
+      : [{ label: "总结全文", prompt: "总结整篇文档要点" }, { label: "提改进建议", prompt: "对这篇文档提出改进建议" }, { label: "调研补充", prompt: "根据文档主题，搜索相关资料并补充到文档中" }];
+    quickEl.innerHTML = actions.map(a => `<button class="cc-quick-btn" data-prompt="${esc(a.prompt)}">${a.label}</button>`).join("");
+    quickEl.querySelectorAll(".cc-quick-btn").forEach(btn => {
+      btn.addEventListener("click", () => { if (!isStreaming) { inputEl.value = btn.dataset.prompt; send(); } });
+    });
+  }
+
+  function updatePlaceholder() {
+    inputEl.placeholder = cachedSelection ? "对选中的内容做什么…" : "告诉我想对文档做什么…";
   }
 
   // ========== LINKED DOCS (with search) ==========
   let linkSearchTimer = null;
+  let linkExpanded = false;
 
   function renderLinkedDocs() {
     linkedDocsEl.innerHTML = "";
-    // Existing linked docs
-    if (linkedDocs.length > 0) {
-      const header = document.createElement("div");
-      header.className = "cc-link-header";
-      header.innerHTML = `<span>${ICON.link} 关联文档 (${linkedDocs.length})</span>`;
-      linkedDocsEl.appendChild(header);
-      linkedDocs.forEach((doc, i) => {
-        const item = document.createElement("div");
-        item.className = "cc-link-item";
-        item.innerHTML = `<span class="cc-link-title">${esc(doc.title || doc.url)}</span><button class="cc-link-rm">×</button>`;
-        item.querySelector(".cc-link-rm").addEventListener("click", () => { linkedDocs.splice(i, 1); renderLinkedDocs(); });
-        linkedDocsEl.appendChild(item);
-      });
-    }
-    // Search input
+    const toggleBtn = document.createElement("button");
+    toggleBtn.className = "cc-link-toggle";
+    toggleBtn.innerHTML = linkedDocs.length > 0
+      ? `${ICON.link} 关联文档 (${linkedDocs.length}) <span class="cc-link-toggle-arrow">${linkExpanded ? "▼" : "▶"}</span>`
+      : `${ICON.plus} 关联文档`;
+    toggleBtn.addEventListener("click", () => { linkExpanded = !linkExpanded; renderLinkedDocs(); });
+    linkedDocsEl.appendChild(toggleBtn);
+    if (!linkExpanded) return;
+
+    linkedDocs.forEach((doc, i) => {
+      const item = document.createElement("div");
+      item.className = "cc-link-item";
+      item.innerHTML = `<span class="cc-link-title">${esc(doc.title || doc.url)}</span><button class="cc-link-rm">×</button>`;
+      item.querySelector(".cc-link-rm").addEventListener("click", () => { linkedDocs.splice(i, 1); renderLinkedDocs(); });
+      linkedDocsEl.appendChild(item);
+    });
+
     const searchWrap = document.createElement("div");
     searchWrap.className = "cc-link-search-wrap";
     searchWrap.innerHTML = `<input class="cc-link-search" placeholder="搜索文档名称关联…" /><div class="cc-link-results"></div>`;
     linkedDocsEl.appendChild(searchWrap);
-
     const searchInput = searchWrap.querySelector(".cc-link-search");
     const resultsEl = searchWrap.querySelector(".cc-link-results");
-
-    // Load recent docs on focus
     searchInput.addEventListener("focus", () => { if (!searchInput.value.trim()) searchDocs("", resultsEl); });
     searchInput.addEventListener("input", () => {
       clearTimeout(linkSearchTimer);
@@ -464,10 +483,12 @@
       });
     });
     actionsEl.querySelector(".cc-write-btn").addEventListener("click", () => {
+      if (isStreaming) return;
       const text = replyEl.innerText || replyEl.textContent;
-      inputEl.value = `将以下内容追加写入当前文档末尾：\n\n${text.slice(0, 2000)}`;
-      inputEl.style.height = "auto"; inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
-      inputEl.focus();
+      const btn = actionsEl.querySelector(".cc-write-btn");
+      btn.innerHTML = `${ICON.docWrite} 写入中…`; btn.disabled = true;
+      inputEl.value = `将以下内容追加写入当前文档末尾：\n\n${text}`;
+      send();
     });
   }
 
@@ -481,6 +502,15 @@
   function updateStatus(el, msg) { const l = el.querySelector('.cc-step[data-type="status"]'); if (l) l.querySelector(".cc-step-text").textContent = msg; else addStep(el, "status", msg); }
   function clearSteps(el, type) { el.querySelectorAll(`.cc-step[data-type="${type}"]`).forEach(n => n.remove()); }
   function scrollContainer(container) { requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; }); }
+
+  function humanizeError(err) {
+    if (!err) return "发生未知错误，请重试";
+    if (err.includes("超时")) return "请求处理时间过长，已自动停止，请尝试简化请求后重试";
+    if (/退出码\s*\d+/.test(err)) return "Claude 处理异常，请重试";
+    if (err.includes("SIGTERM") || err.includes("SIGKILL")) return "请求已被终止";
+    if (err.includes("无法启动")) return "无法启动 Claude，请确认 Bridge 正在运行";
+    return err;
+  }
 
   // ========== MARKDOWN ==========
   function renderMarkdown(text) {
@@ -518,7 +548,7 @@
 
     inputHistory.unshift(text); if (inputHistory.length > 20) inputHistory.pop(); historyIdx = -1;
 
-    isStreaming = true; sendBtn.disabled = true; stopBtn.classList.add("cc-active");
+    isStreaming = true; sendBtn.disabled = true; stopBtn.classList.add("cc-active"); fab.classList.add("cc-streaming");
     addUserMsg(container, text);
     const { activityEl, replyEl, actionsEl } = addAssistantMsg(container);
     inputEl.value = ""; inputEl.style.height = "auto";
@@ -587,8 +617,9 @@
         case "error": {
           clearSteps(activityEl, "status"); clearSteps(activityEl, "thinking");
           if (activityEl.children.length > 0) collapseActivity();
+          const friendlyMsg = humanizeError(ev.error);
           const isTimeout = (ev.error || "").includes("超时");
-          replyEl.innerHTML = `<div class="cc-error">${esc(ev.error)}</div>`;
+          replyEl.innerHTML = `<div class="cc-error">${esc(friendlyMsg)}</div>`;
           if (isTimeout) { const btn = document.createElement("button"); btn.className = "cc-retry-btn"; btn.textContent = "重试"; btn.addEventListener("click", () => { container.removeChild(container.lastElementChild); container.removeChild(container.lastElementChild); inputEl.value = text; send(); }); replyEl.querySelector(".cc-error").appendChild(document.createElement("br")); replyEl.querySelector(".cc-error").appendChild(btn); }
           scroll(); persistIndex(); break;
         }
@@ -641,12 +672,32 @@
         }
       }
       LOG("stopped after", polls, "polls");
-      if (accumulated && !replyEl.querySelector(".cc-md") && !replyEl.querySelector(".cc-error")) replyEl.innerHTML = renderMarkdown(accumulated);
+      activityEl.querySelectorAll(".cc-spinning").forEach(el => el.classList.remove("cc-spinning"));
+      if (currentToolStep) {
+        const ic = currentToolStep.querySelector(".cc-step-icon");
+        if (ic) { ic.className = "cc-step-icon"; ic.textContent = "⏹"; }
+        currentToolStep = null;
+      }
+      if (renderFrame) { cancelAnimationFrame(renderFrame); renderFrame = null; }
+      if (!actionsEl.querySelector(".cc-action-btn")) {
+        if (activityEl.children.length > 0 && !activityEl.querySelector(".cc-activity-summary")) {
+          collapseActivity();
+          const summary = activityEl.querySelector(".cc-activity-summary");
+          if (summary) summary.innerHTML = summary.innerHTML.replace("已完成", "已停止");
+        }
+        if (accumulated) {
+          replyEl.innerHTML = renderMarkdown(accumulated) + `<div class="cc-stopped">⏹ 已停止生成</div>`;
+          addMsgActions(actionsEl, replyEl);
+        } else if (!replyEl.querySelector(".cc-error")) {
+          replyEl.innerHTML = `<div class="cc-stopped">⏹ 已停止生成</div>`;
+        }
+        persistIndex();
+      }
     } catch (err) {
       replyEl.innerHTML = `<div class="cc-error">无法连接 Bridge，请确认已运行 <code>cd bridge && npm start</code></div>`;
     } finally {
       if (renderFrame) cancelAnimationFrame(renderFrame);
-      isStreaming = false; sendBtn.disabled = false; stopBtn.classList.remove("cc-active"); abortController = null;
+      isStreaming = false; sendBtn.disabled = false; stopBtn.classList.remove("cc-active"); fab.classList.remove("cc-streaming"); abortController = null;
       persistIndex();
     }
   }
@@ -659,6 +710,22 @@
     hdr.addEventListener("mousedown", (e) => { if (e.target.closest(".cc-header-btn")) return; d = true; const r = panel.getBoundingClientRect(); sx = e.clientX; sy = e.clientY; sl = r.left; st = r.top; panel.style.right = "auto"; panel.style.bottom = "auto"; panel.style.left = r.left + "px"; panel.style.top = r.top + "px"; document.body.style.userSelect = "none"; e.preventDefault(); });
     window.addEventListener("mousemove", (e) => { if (!d) return; panel.style.left = Math.max(0, Math.min(innerWidth - 100, sl + e.clientX - sx)) + "px"; panel.style.top = Math.max(0, Math.min(innerHeight - 100, st + e.clientY - sy)) + "px"; });
     window.addEventListener("mouseup", () => { if (d) { d = false; document.body.style.userSelect = ""; } });
+  })();
+
+  // ========== RESIZE ==========
+  (function () {
+    const handle = document.createElement("div");
+    handle.className = "cc-resize-handle";
+    panel.appendChild(handle);
+    let r = false, sx, sy, sw, sh;
+    handle.addEventListener("mousedown", (e) => {
+      r = true; const rect = panel.getBoundingClientRect();
+      sx = e.clientX; sy = e.clientY; sw = rect.width; sh = rect.height;
+      if (panel.style.right !== "auto") { panel.style.left = rect.left + "px"; panel.style.top = rect.top + "px"; panel.style.right = "auto"; panel.style.bottom = "auto"; }
+      document.body.style.userSelect = "none"; e.preventDefault(); e.stopPropagation();
+    });
+    window.addEventListener("mousemove", (e) => { if (!r) return; panel.style.width = Math.max(320, Math.min(600, sw + e.clientX - sx)) + "px"; panel.style.height = Math.max(340, Math.min(innerHeight * 0.9, sh + e.clientY - sy)) + "px"; });
+    window.addEventListener("mouseup", () => { if (r) { r = false; document.body.style.userSelect = ""; } });
   })();
 
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
