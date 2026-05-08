@@ -92,6 +92,13 @@ Bridge 解析 Claude CLI 的 `stream-json` 输出，转换为前端事件：
 ### 导入本地 Claude Code 会话
 从 `~/.claude/projects/` 扫描本地 session 文件，提取标题和摘要，用户通过列表选择导入。使用 `--fork-session` 创建分支，不干扰终端正在运行的 session。
 
+## 安全说明
+
+- **Bridge 仅监听 127.0.0.1**：不对外暴露，只有本机可访问
+- **CORS 限制**：仅允许来自 `365.kdocs.cn` 和 `www.kdocs.cn` 的请求
+- **`--dangerously-skip-permissions`**：Bridge 调用 Claude CLI 时跳过权限确认，以实现自动化操作。这意味着 Claude 可以不经确认地读写本地文件和执行命令。请确保你信任你发送的请求内容
+- **WPS Cookie**：存储在 `~/.claude/secrets/wps365.json`，不会出现在代码或日志中
+
 ## 环境变量
 
 | 变量 | 默认值 | 说明 |

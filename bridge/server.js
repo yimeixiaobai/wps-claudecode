@@ -18,9 +18,12 @@ const C = {
 
 const app = express();
 
+const ALLOWED_ORIGINS = ["https://365.kdocs.cn", "https://www.kdocs.cn"];
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  res.setHeader("Access-Control-Allow-Origin", origin || "*");
+  if (origin && ALLOWED_ORIGINS.some(o => origin.startsWith(o))) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.sendStatus(204);
@@ -478,7 +481,7 @@ app.post("/stop/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "127.0.0.1", () => {
   console.log(`${C.green}${C.bold}✅ Bridge listening on http://localhost:${PORT}${C.reset}`);
   console.log(`   CLAUDE_BIN=${CLAUDE_BIN}`);
   console.log(`   Mode: polling (POST /start → GET /poll/:id)`);

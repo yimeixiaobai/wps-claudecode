@@ -2,4 +2,10 @@ node_modules/
 .DS_Store
 *.log
 .idea
-
+.env
+.env.*
+.claude/
+secrets/
+*.pem
+*.key
+extension/diagnose.js
