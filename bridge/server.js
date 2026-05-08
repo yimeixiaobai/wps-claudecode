@@ -136,7 +136,9 @@ app.get("/panel", async (req, res) => {
          .cc-fab{display:none!important;}
          .cc-panel{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;border-radius:0!important;border:none!important;box-shadow:none!important;display:flex!important;contain:unset!important;}
          .cc-close-btn{display:none!important;}`
-      : `html,body{margin:0;height:100%;background:transparent!important;}`;
+      : `html,body{margin:0;height:100%;background:transparent!important;}
+         .cc-panel.cc-visible{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;border-radius:12px!important;box-shadow:0 8px 32px rgba(0,0,0,0.15)!important;}
+         .cc-fab{position:fixed;right:16px;bottom:16px;}`;
     const autoOpen = mode === "sidebar" ? `document.querySelector('.cc-fab')?.click();` : "";
     const globals = `window.__CC_DOC_URL__=${JSON.stringify(docUrl)};window.__CC_DOC_TITLE__=${JSON.stringify(docTitle)};`;
     // Use string concat, not template literal, to avoid ${}  in js breaking interpolation
