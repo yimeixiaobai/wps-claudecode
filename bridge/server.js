@@ -138,13 +138,13 @@ app.get("/panel", async (req, res) => {
          .cc-close-btn{display:none!important;}`
       : `html,body{margin:0;height:100%;background:transparent!important;}`;
     const autoOpen = mode === "sidebar" ? `document.querySelector('.cc-fab')?.click();` : "";
-    res.type("html").send(`<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Claude Code</title>
-<style>*{box-sizing:border-box;}${extraCSS}</style></head>
-<body><script>
-window.__CC_DOC_URL__=${JSON.stringify(docUrl)};
-window.__CC_DOC_TITLE__=${JSON.stringify(docTitle)};
-${js}${autoOpen}</script></body></html>`);
+    const globals = `window.__CC_DOC_URL__=${JSON.stringify(docUrl)};window.__CC_DOC_TITLE__=${JSON.stringify(docTitle)};`;
+    // Use string concat, not template literal, to avoid ${}  in js breaking interpolation
+    res.type("html").send(
+      '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Claude Code</title>' +
+      '<style>*{box-sizing:border-box;}' + extraCSS + '</style></head>' +
+      '<body><script>' + globals + js + autoOpen + '</script></body></html>'
+    );
   } catch (err) {
     res.type("html").send(`<h3>请先构建注入脚本</h3><pre>cd /path/to/wps-cc && node build-inject.js</pre><p>${err.message}</p>`);
   }
