@@ -130,13 +130,14 @@ app.get("/panel", async (req, res) => {
     const js = await fs.promises.readFile(jsPath, "utf-8");
     res.type("html").send(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Claude Code</title>
-<style>html,body{margin:0;height:100%;background:#f5f5f5;font-family:-apple-system,"PingFang SC",sans-serif;}
+<style>
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--cc-surface-1,#fff);}
 .cc-fab{display:none!important;}
-.cc-panel{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;border-radius:0!important;border:none!important;box-shadow:none!important;display:flex!important;}
-.cc-panel.cc-visible{display:flex!important;}
-.cc-header{cursor:default!important;}
+.cc-panel{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;border-radius:0!important;border:none!important;box-shadow:none!important;display:flex!important;contain:unset!important;}
+.cc-header{cursor:default!important;border-radius:0!important;}
+.cc-close-btn{display:none!important;}
 </style></head><body><script>${js}
-// Auto-open panel
 document.querySelector('.cc-fab')?.click();
 </script></body></html>`);
   } catch (err) {
