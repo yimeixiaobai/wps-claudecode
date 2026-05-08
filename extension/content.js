@@ -7,6 +7,8 @@
   if (window.__CC_WPS_INJECTED__) return;
   window.__CC_WPS_INJECTED__ = true;
 
+  const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+  const MOD_KEY = isMac ? "⌥" : "Alt";
   const LOG = (...args) => console.log("[CC]", ...args);
   const BRIDGE = "http://localhost:5174";
   function getDocUrl() { return window.__CC_DOC_URL__ || location.href; }
@@ -56,7 +58,7 @@
   // ========== FAB ==========
   const fab = document.createElement("div");
   fab.className = "cc-fab";
-  fab.title = "Claude Code (Alt+J)";
+  fab.title = `Claude Code (${MOD_KEY}+J)`;
   fab.innerHTML = ICON.sparkle + `<span class="cc-status-dot"></span>`;
   document.body.appendChild(fab);
   const statusDot = fab.querySelector(".cc-status-dot");
@@ -86,10 +88,10 @@
       <div class="cc-selection-bar"></div>
       <div class="cc-input-wrapper">
         <textarea class="cc-input" rows="1" placeholder="输入你的请求…"></textarea>
-        <button class="cc-send-btn" title="发送 (⌘/Ctrl+Enter)">${ICON.send}</button>
+        <button class="cc-send-btn" title="发送 (Enter)">${ICON.send}</button>
       </div>
       <div class="cc-input-footer">
-        <span class="cc-input-hint"><kbd>⌘</kbd>+<kbd>↵</kbd> 发送</span>
+        <span class="cc-input-hint"><kbd>↵</kbd> 发送 · <kbd>Shift</kbd>+<kbd>↵</kbd> 换行</span>
       </div>
     </div>
   `;
@@ -296,7 +298,7 @@
   let historyIdx = -1;
 
   inputEl.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); send(); return; }
+    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); send(); return; }
     // ↑ key recall last input (only when input is empty or at start)
     if (e.key === "ArrowUp" && inputEl.selectionStart === 0 && inputHistory.length > 0) {
       e.preventDefault();
@@ -413,7 +415,7 @@
   async function checkHealth() { try { const r = await fetch(BRIDGE + "/health", { signal: AbortSignal.timeout(3000) }); bridgeOnline = !!(await r.json()).ok; } catch (_) { bridgeOnline = false; } statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline"); }
 
   // ========== HELPERS ==========
-  function getWelcomeHTML() { return `<div class="cc-welcome"><div class="cc-welcome-title">Claude Code</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-shortcuts"><span><kbd>Alt</kbd>+<kbd>J</kbd> 打开</span><span><kbd>⌘</kbd>+<kbd>↵</kbd> 发送</span></div></div>`; }
+  function getWelcomeHTML() { return `<div class="cc-welcome"><div class="cc-welcome-title">Claude Code</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-shortcuts"><span><kbd>${MOD_KEY}</kbd>+<kbd>J</kbd> 打开</span><span><kbd>↵</kbd> 发送</span></div></div>`; }
 
   function addUserMsg(container, text) {
     const w = container.querySelector(".cc-welcome"); if (w) w.remove();
