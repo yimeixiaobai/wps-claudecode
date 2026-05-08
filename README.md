@@ -56,16 +56,38 @@ cd bridge && npm install && npm start
 >
 > 首次双击 `.command` 文件如果被 macOS 拦截，右键 → 打开 即可。
 
-### 2. 安装扩展
+### 2. 安装客户端
+
+根据你的使用环境选择一种方式：
+
+#### 方式 A：Chrome/Edge 浏览器扩展（推荐用于 WPS 365 网页版）
 
 1. 打开 `chrome://extensions`（或 `edge://extensions`）
 2. 开启「开发者模式」
 3. 点「加载已解压的扩展程序」→ 选 `extension/` 文件夹
 4. 打开 WPS 365 文档，右下角出现橘色 CC 按钮
 
+#### 方式 B：WPS协作 桌面客户端（WOA）
+
+WOA 不支持浏览器扩展，通过 DevTools Snippet 注入：
+
+1. 在 WOA 中按 **F12** 打开 DevTools
+2. 切到 **Sources（源代码）** → 左侧 **Snippets（代码段）**
+3. 点 **+ New snippet**，命名为 `Claude Code`
+4. 把 `dist/woa-snippet.js` 的内容粘贴进去，**Ctrl+S** 保存
+5. 右键该 snippet → **Run**（或 Ctrl+Enter）
+
+> 以后每次打开 WOA 只需：Sources → Snippets → 右键 Claude Code → Run
+>
+> 再次运行可关闭面板。
+
+#### 方式 C：任意网页环境（控制台注入）
+
+在 DevTools Console 中粘贴 `dist/inject-console.js` 的内容即可注入完整面板。适用于有控制台访问权限但无法安装扩展的环境。
+
 ### 3. 使用
 
-- 点 **CC 按钮** 或按 **Alt+J** 打开面板
+- 点 **CC 按钮** 或按 **Alt+J**（浏览器扩展）打开面板
 - 在文档中选中文字，面板输入框上方自动显示选区引用
 - 输入请求，按 **⌘/Ctrl+Enter** 发送
 - 实时看到工具调用步骤 → 流式文字输出 → 完成后自动折叠步骤摘要
