@@ -34,6 +34,22 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: "2mb" }));
 
+// ========== Request logger ==========
+const QUIET_PATHS = new Set(["/health"]);
+app.use((req, res, next) => {
+  const quiet = QUIET_PATHS.has(req.path) || req.path.startsWith("/poll/");
+  const t0 = Date.now();
+  const ts = new Date(t0).toLocaleTimeString("zh-CN", { hour12: false });
+  if (!quiet) console.log(`${C.dim}${ts}${C.reset} ${C.cyan}→${C.reset} ${req.method} ${req.originalUrl}`);
+  const origEnd = res.end;
+  res.end = function (...args) {
+    const ms = Date.now() - t0;
+    if (!quiet) console.log(`${C.dim}${ts}${C.reset} ${C.green}←${C.reset} ${req.method} ${req.originalUrl} ${C.dim}[${res.statusCode}] ${ms}ms${C.reset}`);
+    origEnd.apply(res, args);
+  };
+  next();
+});
+
 // ========== Session store ==========
 const sessions = new Map();
 
@@ -165,12 +181,44 @@ async function getWpsCookie() {
 // ========== Routes ==========
 app.get("/health", (_, res) => res.json({ ok: true }));
 
+// Resolve short link → numeric file ID (cached per short code)
+const shortLinkCache = new Map();
+async function resolveShortLink(shortCode, cookie) {
+  if (shortLinkCache.has(shortCode)) return shortLinkCache.get(shortCode);
+  try {
+    // Follow redirects, check final URL for numeric file ID
+    const r = await fetch(`https://365.kdocs.cn/l/${shortCode}`, {
+      headers: { Cookie: cookie }, redirect: "follow",
+    });
+    const finalUrl = r.url || "";
+    const body = await r.text();
+    // Try final URL first
+    let m = finalUrl.match(/\/(\d{6,})/);
+    // Fallback: look for file ID in response body (e.g. window.__FILE_ID__ or "file_id":12345)
+    if (!m) m = body.match(/["']?file_?id["']?\s*[:=]\s*["']?(\d{6,})/i);
+    if (!m) m = body.match(/\/p\/(\d{6,})/);
+    const fileId = m ? m[1] : null;
+    shortLinkCache.set(shortCode, fileId);
+    return fileId;
+  } catch (e) {
+    return null;
+  }
+}
+
 // Search WPS docs by keyword, or list recent docs (no keyword)
 app.get("/search-docs", async (req, res) => {
   try {
     const keyword = req.query.q || "";
+    const curUrl = req.query.curUrl || "";
     const cookie = await getWpsCookie();
     if (!cookie) return res.json({ ok: false, error: "WPS cookie 未配置" });
+
+    // Resolve current doc's numeric ID from short link
+    let excludeId = null;
+    const shortMatch = curUrl.match(/\/l\/([A-Za-z0-9_-]+)/);
+    if (shortMatch) {
+      excludeId = await resolveShortLink(shortMatch[1], cookie);
+    }
 
     const params = new URLSearchParams({ offset: "0", count: "10", sort_by: "modify_time", order: "desc" });
     if (keyword) params.set("searchname", keyword);
@@ -188,7 +236,7 @@ app.get("/search-docs", async (req, res) => {
       type: f.ftype || "unknown",
       url: `https://365.kdocs.cn/l/${f.id}`,
       updatedAt: (f.mtime || f.modify_time || 0) * 1000,
-    }));
+    })).filter(d => d.id !== excludeId);
     res.json({ ok: true, docs });
   } catch (err) {
     res.json({ ok: false, error: err.message });

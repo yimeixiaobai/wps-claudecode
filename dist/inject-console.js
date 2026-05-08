@@ -19,22 +19,7 @@ window.__CC_READ_SELECTION__ = function() {
   const LOG = (...args) => console.log("[CC]", ...args);
   const BRIDGE = "http://localhost:5174";
 
-  async function bridgeFetch(path, opts, { quiet } = {}) {
-    const url = BRIDGE + path;
-    const method = opts?.method || "GET";
-    const t0 = performance.now();
-    if (!quiet) LOG(`>> ${method} ${path}`);
-    try {
-      const r = await fetch(url, opts);
-      const ms = (performance.now() - t0).toFixed(0);
-      if (!quiet) LOG(`<< ${method} ${path} [${r.status}] ${ms}ms`);
-      return r;
-    } catch (e) {
-      const ms = (performance.now() - t0).toFixed(0);
-      LOG(`!! ${method} ${path} FAIL ${ms}ms`, e.message);
-      throw e;
-    }
-  }
+
   function getDocUrl() { return window.__CC_DOC_URL__ || location.href; }
   function getDocTitle() { return window.__CC_DOC_TITLE__ || document.title; }
   const MAX_SESSIONS = 20;
@@ -251,7 +236,7 @@ window.__CC_READ_SELECTION__ = function() {
     const listWrap = sessionListEl.querySelector(".cc-sl-list-wrap");
     if (!listWrap) return;
     try {
-      const r = await bridgeFetch("/local-sessions");
+      const r = await fetch(BRIDGE + "/local-sessions");
       const d = await r.json();
       if (!d.ok || !d.sessions?.length) { listWrap.innerHTML = `<div class="cc-sl-empty">未找到本地 Claude 会话</div>`; return; }
       listWrap.innerHTML = "";
@@ -410,12 +395,12 @@ window.__CC_READ_SELECTION__ = function() {
   async function searchDocs(q, resultsEl) {
     resultsEl.innerHTML = `<div class="cc-link-loading">搜索中…</div>`;
     try {
-      const r = await bridgeFetch("/search-docs?q=" + encodeURIComponent(q));
+      const r = await fetch(BRIDGE + "/search-docs?q=" + encodeURIComponent(q) + "&curUrl=" + encodeURIComponent(getDocUrl()));
       const d = await r.json();
       if (!d.ok || !d.docs?.length) { resultsEl.innerHTML = `<div class="cc-link-loading">${q ? "未找到" : "暂无最近文档"}</div>`; return; }
       resultsEl.innerHTML = "";
       d.docs.forEach(doc => {
-        if (linkedDocs.some(ld => ld.url === doc.url)) return; // skip already linked
+        if (linkedDocs.some(ld => ld.url === doc.url)) return;
         const item = document.createElement("div");
         item.className = "cc-link-result";
         const t = doc.updatedAt ? new Date(doc.updatedAt) : null;
@@ -435,7 +420,7 @@ window.__CC_READ_SELECTION__ = function() {
   renderLinkedDocs();
 
   // ========== HEALTH ==========
-  async function checkHealth() { try { const r = await bridgeFetch("/health", { signal: AbortSignal.timeout(3000) }, { quiet: true }); bridgeOnline = !!(await r.json()).ok; } catch (_) { bridgeOnline = false; } statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline"); }
+  async function checkHealth() { try { const r = await fetch(BRIDGE + "/health", { signal: AbortSignal.timeout(3000) }); bridgeOnline = !!(await r.json()).ok; } catch (_) { bridgeOnline = false; } statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline"); }
 
   // ========== HELPERS ==========
   function getWelcomeHTML() { return `<div class="cc-welcome"><div class="cc-welcome-title">Claude Code</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-shortcuts"><span><kbd>${MOD_KEY}</kbd>+<kbd>J</kbd> 打开</span><span><kbd>↵</kbd> 发送</span></div></div>`; }
@@ -596,10 +581,10 @@ window.__CC_READ_SELECTION__ = function() {
       }
     }
 
-    abortController = { abort: async () => { stopped = true; if (sessionId) { try { await bridgeFetch("/stop/" + sessionId, { method: "POST" }); } catch (_) {} } } };
+    abortController = { abort: async () => { stopped = true; if (sessionId) { try { await fetch(BRIDGE + "/stop/" + sessionId, { method: "POST" }); } catch (_) {} } } };
 
     try {
-      const startRes = await bridgeFetch("/start", {
+      const startRes = await fetch(BRIDGE + "/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ request: text, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, claudeSessionId: targetClaudeSession, claudeCwd: targetCwd }),
       });
@@ -610,10 +595,10 @@ window.__CC_READ_SELECTION__ = function() {
       while (!stopped) {
         await sleep(200); if (stopped) break;
         try {
-          const r = await bridgeFetch("/poll/" + sessionId + "?cursor=" + cursor, undefined, { quiet: true });
+          const r = await fetch(BRIDGE + "/poll/" + sessionId + "?cursor=" + cursor);
           const p = await r.json(); if (!p.ok) break;
           polls++; consecutiveErrors = 0;
-          if (p.events?.length) LOG(`<< poll #${polls} got ${p.events.length} event(s)`);
+
           for (const ev of p.events) {
             if (ev.type === "close" || ev.type === "done" || ev.type === "error") stopped = true;
             try { handleEvent(ev); } catch (e) { LOG("event error:", e); }

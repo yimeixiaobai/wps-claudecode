@@ -35,8 +35,8 @@ if ! command -v claude &>/dev/null; then
   exit 1
 fi
 
-# 端口检查
-EXISTING_PID=$(lsof -ti :5174 2>/dev/null)
+# 端口检查 — 只检测 LISTEN 状态，忽略 CLOSED/TIME_WAIT 等残留连接
+EXISTING_PID=$(lsof -ti :5174 -sTCP:LISTEN 2>/dev/null)
 if [ -n "$EXISTING_PID" ]; then
   echo "⚠️  端口 5174 已被占用 (PID: $EXISTING_PID)"
   echo "   Bridge 可能已在运行，或其他程序占用了此端口。"
