@@ -121,6 +121,29 @@ function buildPrompt({ request, url, title, selection, linkedDocs }) {
   ].join("\n");
 }
 
+// ========== Standalone Panel Page (bypasses CSP) ==========
+app.get("/panel", async (req, res) => {
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+    const jsPath = path.join(import.meta.dirname || ".", "..", "dist", "inject-console.js");
+    const js = await fs.promises.readFile(jsPath, "utf-8");
+    res.type("html").send(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Claude Code</title>
+<style>html,body{margin:0;height:100%;background:#f5f5f5;font-family:-apple-system,"PingFang SC",sans-serif;}
+.cc-fab{display:none!important;}
+.cc-panel{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;border-radius:0!important;border:none!important;box-shadow:none!important;display:flex!important;}
+.cc-panel.cc-visible{display:flex!important;}
+.cc-header{cursor:default!important;}
+</style></head><body><script>${js}
+// Auto-open panel
+document.querySelector('.cc-fab')?.click();
+</script></body></html>`);
+  } catch (err) {
+    res.type("html").send(`<h3>请先构建注入脚本</h3><pre>cd /path/to/wps-cc && node build-inject.js</pre><p>${err.message}</p>`);
+  }
+});
+
 // ========== WPS Doc Search ==========
 async function getWpsCookie() {
   const os = await import("os");
