@@ -174,6 +174,25 @@
     } catch (_) {}
   }
 
+  function rebindContainerEvents(container) {
+    container.querySelectorAll(".cc-activity-summary").forEach(summary => {
+      const wrap = summary.nextElementSibling;
+      if (!wrap || !wrap.classList.contains("cc-activity-details")) return;
+      summary.addEventListener("click", () => {
+        const open = wrap.style.display !== "none";
+        wrap.style.display = open ? "none" : "block";
+        summary.querySelector(".cc-summary-toggle").textContent = open ? "▶" : "▼";
+      });
+    });
+    container.querySelectorAll(".cc-msg-assistant").forEach(msg => {
+      const replyEl = msg.querySelector(".cc-reply");
+      const actionsEl = msg.querySelector(".cc-msg-actions");
+      if (replyEl && actionsEl && actionsEl.querySelector(".cc-copy-btn")) {
+        addMsgActions(actionsEl, replyEl);
+      }
+    });
+  }
+
   async function restoreIndex() {
     try {
       const data = await chrome.storage.local.get(STORAGE_KEY);
@@ -181,6 +200,7 @@
       saved.forEach(s => {
         const container = createConvContainer();
         if (s.html) container.innerHTML = s.html;
+        rebindContainerEvents(container);
         container.style.display = "none";
         msgsWrap.appendChild(container);
         convs.push({ id: s.id, claudeSessionId: s.claudeSessionId, claudeCwd: s.claudeCwd || null, title: s.title, container, createdAt: s.createdAt });
