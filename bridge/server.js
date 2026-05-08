@@ -18,10 +18,11 @@ const C = {
 
 const app = express();
 
-const ALLOWED_ORIGINS = ["https://365.kdocs.cn", "https://www.kdocs.cn"];
+const ALLOWED_ORIGINS = (process.env.CC_ALLOWED_ORIGINS || "https://365.kdocs.cn,https://www.kdocs.cn").split(",").map(s => s.trim());
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin && ALLOWED_ORIGINS.some(o => origin.startsWith(o))) {
+  // Bridge is localhost-only (127.0.0.1), CORS is defense-in-depth
+  if (origin && (ALLOWED_ORIGINS.some(o => origin.startsWith(o)) || ALLOWED_ORIGINS.includes("*"))) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
