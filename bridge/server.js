@@ -129,6 +129,8 @@ app.get("/panel", async (req, res) => {
     const jsPath = path.join(import.meta.dirname || ".", "..", "dist", "inject-console.js");
     const js = await fs.promises.readFile(jsPath, "utf-8");
     const mode = req.query.mode || "float";
+    const docUrl = req.query.docUrl || "";
+    const docTitle = req.query.docTitle || "";
     const extraCSS = mode === "sidebar"
       ? `html,body{margin:0;height:100%;overflow:hidden;background:var(--cc-surface-1,#fff);}
          .cc-fab{display:none!important;}
@@ -139,7 +141,10 @@ app.get("/panel", async (req, res) => {
     res.type("html").send(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Claude Code</title>
 <style>*{box-sizing:border-box;}${extraCSS}</style></head>
-<body><script>${js}${autoOpen}</script></body></html>`);
+<body><script>
+window.__CC_DOC_URL__=${JSON.stringify(docUrl)};
+window.__CC_DOC_TITLE__=${JSON.stringify(docTitle)};
+${js}${autoOpen}</script></body></html>`);
   } catch (err) {
     res.type("html").send(`<h3>请先构建注入脚本</h3><pre>cd /path/to/wps-cc && node build-inject.js</pre><p>${err.message}</p>`);
   }

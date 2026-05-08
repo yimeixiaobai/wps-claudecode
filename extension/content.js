@@ -9,6 +9,8 @@
 
   const LOG = (...args) => console.log("[CC]", ...args);
   const BRIDGE = "http://localhost:5174";
+  function getDocUrl() { return window.__CC_DOC_URL__ || location.href; }
+  function getDocTitle() { return window.__CC_DOC_TITLE__ || document.title; }
   const MAX_SESSIONS = 20;
 
   let cachedSelection = "";
@@ -18,11 +20,12 @@
 
   // ========== DOCUMENT ID (for per-document conversation isolation) ==========
   const docId = (() => {
-    const m = location.pathname.match(/\/l\/([A-Za-z0-9]+)/);
+    const url = window.__CC_DOC_URL__ || location.href;
+    const m = url.match(/\/l\/([A-Za-z0-9]+)/);
     if (m) return m[1];
-    const m2 = location.pathname.match(/\/(\d+)\//);
+    const m2 = url.match(/\/(\d+)\//);
     if (m2) return m2[1];
-    return location.pathname.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 40);
+    return url.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 40);
   })();
   const STORAGE_KEY = "cc_convs_" + docId;
   LOG("doc isolation key:", docId);
@@ -573,7 +576,7 @@
     try {
       const startRes = await fetch(BRIDGE + "/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request: text, url: location.href, title: document.title, selection, linkedDocs, claudeSessionId: targetClaudeSession, claudeCwd: targetCwd }),
+        body: JSON.stringify({ request: text, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, claudeSessionId: targetClaudeSession, claudeCwd: targetCwd }),
       });
       const d = await startRes.json(); if (!d.ok) throw new Error(d.error || "启动失败");
       sessionId = d.sessionId; LOG("session:", sessionId);
