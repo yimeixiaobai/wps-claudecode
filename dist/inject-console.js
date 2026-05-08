@@ -286,8 +286,8 @@ window.__CC_READ_SELECTION__ = function() {
   function hideSessionList() { sessionListEl.classList.remove("cc-sl-visible"); }
 
   // ========== PANEL ==========
-  function showPanel() { panel.classList.add("cc-visible"); requestSelection(); inputEl.focus(); checkHealth(); }
-  function hidePanel() { panel.classList.remove("cc-visible"); hideSessionList(); }
+  function showPanel() { panel.classList.add("cc-visible"); requestSelection(); inputEl.focus(); checkHealth(); try { window.parent.postMessage("cc-panel-open", "*"); } catch(_) {} }
+  function hidePanel() { panel.classList.remove("cc-visible"); hideSessionList(); try { window.parent.postMessage("cc-panel-close", "*"); } catch(_) {} }
   fab.addEventListener("click", () => panel.classList.contains("cc-visible") ? hidePanel() : showPanel());
   panel.querySelector(".cc-close-btn").addEventListener("click", hidePanel);
   panel.querySelector(".cc-sessions-btn").addEventListener("click", toggleSessionList);
