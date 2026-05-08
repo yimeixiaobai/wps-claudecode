@@ -22,7 +22,9 @@ const ALLOWED_ORIGINS = (process.env.CC_ALLOWED_ORIGINS || "https://365.kdocs.cn
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   // Bridge is localhost-only (127.0.0.1), CORS is defense-in-depth
-  if (origin && (ALLOWED_ORIGINS.some(o => origin.startsWith(o)) || ALLOWED_ORIGINS.includes("*"))) {
+  if (ALLOWED_ORIGINS.includes("*") || !origin || origin === "null") {
+    res.setHeader("Access-Control-Allow-Origin", origin || "*");
+  } else if (origin && ALLOWED_ORIGINS.some(o => origin.startsWith(o))) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
