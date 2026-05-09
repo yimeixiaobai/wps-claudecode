@@ -1,9 +1,19 @@
 #!/bin/bash
 # install.command — 一键安装 Claude Code × WPS 智能文档
-# macOS Finder 中双击即可运行
+# macOS Finder 中双击即可运行；也可被 bridge 自动更新调用
 
 cd "$(dirname "$0")"
 REPO_DIR="$(pwd)"
+
+# 检测是否为交互式终端（非交互时跳过 read 等待）
+INTERACTIVE=false
+[ -t 0 ] && INTERACTIVE=true
+
+wait_for_enter() {
+  if $INTERACTIVE; then
+    read -p "$1"
+  fi
+}
 
 printf '\033]0;Claude Code × WPS 安装\007'
 
@@ -38,7 +48,7 @@ if [ -z "$NODE_MAJOR" ] || [ "$NODE_MAJOR" -lt 18 ]; then
   echo "  ❌ 需要 Node.js 18+（当前: ${NODE_VER:-未安装}）"
   echo "     安装方式: brew install node  或  https://nodejs.org"
   echo ""
-  read -p "按 Enter 关闭…"
+  wait_for_enter "按 Enter 关闭…"
   exit 1
 fi
 echo "  ✓ Node.js $NODE_VER"
@@ -53,7 +63,7 @@ if [ -z "$CLAUDE_VER" ]; then
   if [ -z "$CLAUDE_VER" ]; then
     echo "  ❌ Claude CLI 安装失败，请手动执行: npm install -g @anthropic-ai/claude-code"
     echo ""
-    read -p "按 Enter 关闭…"
+    wait_for_enter "按 Enter 关闭…"
     exit 1
   fi
 fi
@@ -69,7 +79,7 @@ SKILL_DST="$HOME/.claude/skills/WPS-AirPage-Skill"
 
 if [ ! -d "$SKILL_SRC" ]; then
   echo "  ❌ 未找到 skills/WPS-AirPage-Skill 目录"
-  read -p "按 Enter 关闭…"
+  wait_for_enter "按 Enter 关闭…"
   exit 1
 fi
 
@@ -279,7 +289,7 @@ if [ "$EXT_INSTALLED" = "yes" ]; then
   echo "  请在扩展管理页中找到 [Claude Code for WPS 365],"
   echo "  点击卡片上的 「刷新」/「重新加载」 按钮完成更新。"
   echo ""
-  read -p "  刷新完成后按 Enter 继续..."
+  wait_for_enter "  刷新完成后按 Enter 继续..."
 else
   echo "  扩展未安装, 正在打开扩展页..."
   if [ -n "$BROWSER_NAME" ]; then
@@ -295,7 +305,7 @@ else
   echo ""
   echo "       $EXT_DIR"
   echo ""
-  read -p "  安装完成后按 Enter 继续..."
+  wait_for_enter "  安装完成后按 Enter 继续..."
 fi
 echo ""
 
@@ -320,4 +330,4 @@ echo "     卸载服务    launchctl unload $PLIST_PATH && rm $PLIST_PATH"
 echo ""
 echo "  打开 WPS 365 文档，右下角出现 CC 按钮即成功 🎉"
 echo ""
-read -p "按 Enter 关闭…"
+wait_for_enter "按 Enter 关闭…"

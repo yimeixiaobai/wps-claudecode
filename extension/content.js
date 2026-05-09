@@ -766,9 +766,11 @@
       <span class="cc-update-icon">↑</span>
       <span class="cc-update-text">新版本 <strong>v${esc(info.latestVersion)}</strong> 可用（当前 v${esc(info.localVersion)}）</span>
       <a class="cc-update-link" href="${esc(info.releaseUrl)}" target="_blank" rel="noopener">查看更新</a>
+      <button class="cc-update-now-btn">立即更新</button>
       <button class="cc-update-dismiss">×</button>
     `;
     updateBanner.style.display = "flex";
+    updateBanner.querySelector(".cc-update-now-btn").addEventListener("click", () => doSelfUpdate());
     updateBanner.querySelector(".cc-update-dismiss").addEventListener("click", () => {
       updateBanner.style.display = "none";
       updateDot.classList.remove("cc-update-available");
@@ -778,6 +780,74 @@
         chrome.storage.local.set({ [UPDATE_CHECK_KEY]: data });
       });
     });
+  }
+
+  async function doSelfUpdate() {
+    const textEl = updateBanner.querySelector(".cc-update-text");
+    const nowBtn = updateBanner.querySelector(".cc-update-now-btn");
+    const linkEl = updateBanner.querySelector(".cc-update-link");
+    const dismissEl = updateBanner.querySelector(".cc-update-dismiss");
+    nowBtn.disabled = true;
+    nowBtn.textContent = "更新中…";
+    if (linkEl) linkEl.style.display = "none";
+    if (dismissEl) dismissEl.style.display = "none";
+    textEl.innerHTML = "正在下载并安装更新…";
+    LOG("[update] starting self-update…");
+
+    try {
+      const r = await fetch(BRIDGE + "/self-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(60000),
+      });
+      const result = await r.json();
+      if (!result.ok) throw new Error(result.error || "更新失败");
+
+      LOG(`[update] self-update success, new version: v${result.version}`);
+      textEl.innerHTML = `已更新到 <strong>v${esc(result.version)}</strong>，正在重启…`;
+      nowBtn.style.display = "none";
+
+      chrome.storage.local.remove(UPDATE_CHECK_KEY);
+      // 通知 service worker 开始轮询，版本变化后自动 reload 扩展
+      chrome.storage.local.set({ cc_self_update_pending: true });
+
+      // 前端也轮询 bridge health，提示用户进度
+      let retries = 0;
+      const poll = setInterval(async () => {
+        retries++;
+        try {
+          const h = await fetch(BRIDGE + "/health", { signal: AbortSignal.timeout(2000) });
+          const hd = await h.json();
+          if (hd.ok) {
+            clearInterval(poll);
+            LOG("[update] bridge restarted, extension will auto-reload via service worker");
+            textEl.innerHTML = "更新完成，扩展即将自动重载…";
+            // 兜底：如果 service worker 没有触发 reload，10 秒后提示手动刷新
+            setTimeout(() => {
+              if (updateBanner.style.display !== "none") {
+                textEl.innerHTML = "更新完成！请刷新页面以加载新版扩展。";
+                const refreshBtn = document.createElement("button");
+                refreshBtn.className = "cc-update-now-btn";
+                refreshBtn.textContent = "刷新页面";
+                refreshBtn.addEventListener("click", () => location.reload());
+                updateBanner.appendChild(refreshBtn);
+              }
+            }, 10000);
+          }
+        } catch (_) {}
+        if (retries > 30) {
+          clearInterval(poll);
+          textEl.innerHTML = "Bridge 重启中，请稍后手动刷新页面";
+        }
+      }, 2000);
+    } catch (e) {
+      LOG("[update] self-update failed:", e.message);
+      textEl.innerHTML = `更新失败：${esc(e.message)}`;
+      nowBtn.textContent = "重试";
+      nowBtn.disabled = false;
+      if (linkEl) linkEl.style.display = "";
+      if (dismissEl) dismissEl.style.display = "";
+    }
   }
 
   function hideUpdateBanner() {

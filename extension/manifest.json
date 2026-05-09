@@ -4,6 +4,9 @@
   "version": "0.3.0",
   "description": "在 WPS 365 智能文档页面内嵌入 Claude Code 入口，自动关联当前文档上下文。",
   "permissions": ["storage", "activeTab"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "host_permissions": [
     "https://365.kdocs.cn/*",
     "https://www.kdocs.cn/*",
