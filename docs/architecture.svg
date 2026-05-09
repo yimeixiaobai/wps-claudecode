@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420" font-family="system-ui,-apple-system,'PingFang SC',sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 6" refX="10" refY="3" markerWidth="8" markerHeight="6" orient="auto"><path d="M0,0 L10,3 L0,6" fill="#999"/></marker>
+    <marker id="arrow-orange" viewBox="0 0 10 6" refX="10" refY="3" markerWidth="8" markerHeight="6" orient="auto"><path d="M0,0 L10,3 L0,6" fill="#D97757"/></marker>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="900" height="420" rx="12" fill="#fafafa"/>
+
+  <!-- 标题 -->
+  <text x="450" y="32" text-anchor="middle" font-size="16" font-weight="700" fill="#1a1a1e">Claude Code × WPS 智能文档 · 交互架构</text>
+
+  <!-- ===== 客户端 ===== -->
+  <rect x="30" y="60" width="180" height="140" rx="10" fill="#fff" stroke="#D97757" stroke-width="1.5"/>
+  <rect x="30" y="60" width="180" height="30" rx="10" fill="#D97757"/>
+  <rect x="30" y="80" width="180" height="10" fill="#D97757"/>
+  <text x="120" y="81" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">客户端</text>
+  <text x="120" y="115" text-anchor="middle" font-size="11" fill="#5a5a63">浮动面板 UI</text>
+  <text x="120" y="132" text-anchor="middle" font-size="11" fill="#5a5a63">会话管理 · 流式渲染</text>
+  <text x="120" y="149" text-anchor="middle" font-size="11" fill="#5a5a63">选区捕获 · 快捷指令</text>
+  <text x="120" y="170" text-anchor="middle" font-size="10" fill="#8a8a95">扩展 / WOA Snippet / 控制台</text>
+
+  <!-- ===== WPS 编辑器 ===== -->
+  <rect x="30" y="230" width="180" height="80" rx="10" fill="#fff" stroke="#e8e8eb" stroke-width="1"/>
+  <text x="120" y="258" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1e">WPS ProseMirror</text>
+  <text x="120" y="278" text-anchor="middle" font-size="10" fill="#8a8a95">APP.core.editor</text>
+  <text x="120" y="295" text-anchor="middle" font-size="10" fill="#8a8a95">按需注入读取选区</text>
+
+  <!-- 客户端 ↔ 编辑器 -->
+  <line x1="120" y1="200" x2="120" y2="230" stroke="#ccc" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="135" y="218" font-size="9" fill="#8a8a95">inject-sel.js</text>
+
+  <!-- ===== Bridge ===== -->
+  <rect x="340" y="60" width="200" height="250" rx="10" fill="#fff" stroke="#4A90D9" stroke-width="1.5"/>
+  <rect x="340" y="60" width="200" height="30" rx="10" fill="#4A90D9"/>
+  <rect x="340" y="80" width="200" height="10" fill="#4A90D9"/>
+  <text x="440" y="81" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">Bridge · localhost:5174</text>
+  <text x="440" y="115" text-anchor="middle" font-size="11" fill="#5a5a63">Express HTTP 服务</text>
+  <text x="440" y="140" text-anchor="middle" font-size="10" fill="#4A90D9" font-weight="500">API 端点:</text>
+  <text x="355" y="158" font-size="10" fill="#5a5a63" font-family="monospace">POST /start</text>
+  <text x="355" y="174" font-size="10" fill="#5a5a63" font-family="monospace">GET  /poll/:id</text>
+  <text x="355" y="190" font-size="10" fill="#5a5a63" font-family="monospace">POST /stop/:id</text>
+  <text x="355" y="206" font-size="10" fill="#5a5a63" font-family="monospace">GET  /search-docs</text>
+  <text x="355" y="222" font-size="10" fill="#5a5a63" font-family="monospace">GET  /local-sessions</text>
+  <text x="440" y="250" text-anchor="middle" font-size="10" fill="#8a8a95">stream-json 解析</text>
+  <text x="440" y="265" text-anchor="middle" font-size="10" fill="#8a8a95">事件缓冲 → 轮询分发</text>
+  <text x="440" y="285" text-anchor="middle" font-size="10" fill="#8a8a95">会话 / 超时管理</text>
+
+  <!-- ===== Claude Code ===== -->
+  <rect x="670" y="60" width="200" height="110" rx="10" fill="#fff" stroke="#5CB87A" stroke-width="1.5"/>
+  <rect x="670" y="60" width="200" height="30" rx="10" fill="#5CB87A"/>
+  <rect x="670" y="80" width="200" height="10" fill="#5CB87A"/>
+  <text x="770" y="81" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">Claude Code CLI</text>
+  <text x="770" y="115" text-anchor="middle" font-size="11" fill="#5a5a63">AI Agent 推理引擎</text>
+  <text x="770" y="135" text-anchor="middle" font-size="10" fill="#8a8a95">--resume · --fork-session</text>
+  <text x="770" y="152" text-anchor="middle" font-size="10" fill="#8a8a95">Bash / Read / Write / WebSearch</text>
+
+  <!-- ===== AirPage Skill ===== -->
+  <rect x="670" y="200" width="200" height="110" rx="10" fill="#fff" stroke="#8B5CF6" stroke-width="1.5"/>
+  <rect x="670" y="200" width="200" height="30" rx="10" fill="#8B5CF6"/>
+  <rect x="670" y="220" width="200" height="10" fill="#8B5CF6"/>
+  <text x="770" y="221" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">WPS-AirPage-Skill</text>
+  <text x="770" y="255" text-anchor="middle" font-size="11" fill="#5a5a63">智能文档操作</text>
+  <text x="770" y="275" text-anchor="middle" font-size="10" fill="#8a8a95">query · update · insert</text>
+  <text x="770" y="292" text-anchor="middle" font-size="10" fill="#8a8a95">search · delete · convert</text>
+
+  <!-- ===== WPS API ===== -->
+  <rect x="720" y="340" width="100" height="50" rx="8" fill="#fff" stroke="#e8e8eb" stroke-width="1"/>
+  <text x="770" y="362" text-anchor="middle" font-size="11" font-weight="500" fill="#1a1a1e">WPS 365</text>
+  <text x="770" y="378" text-anchor="middle" font-size="9" fill="#8a8a95">kdocs API</text>
+
+  <!-- ===== 连线 ===== -->
+
+  <!-- 客户端 → Bridge -->
+  <line x1="210" y1="100" x2="335" y2="100" stroke="#D97757" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+  <text x="272" y="93" text-anchor="middle" font-size="9" fill="#D97757" font-weight="500">POST /start</text>
+  <text x="272" y="105" text-anchor="middle" font-size="9" fill="#8a8a95">{request, url, selection}</text>
+
+  <!-- Bridge → 客户端 -->
+  <line x1="335" y1="135" x2="210" y2="135" stroke="#D97757" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+  <text x="272" y="128" text-anchor="middle" font-size="9" fill="#D97757" font-weight="500">GET /poll/:id</text>
+  <text x="272" y="148" text-anchor="middle" font-size="9" fill="#8a8a95">{events[], done} 200ms</text>
+
+  <!-- Bridge → Claude -->
+  <line x1="540" y1="100" x2="665" y2="100" stroke="#4A90D9" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="602" y="93" text-anchor="middle" font-size="9" fill="#4A90D9" font-weight="500">spawn</text>
+  <text x="602" y="105" text-anchor="middle" font-size="9" fill="#8a8a95">claude -p "..."</text>
+
+  <!-- Claude → Bridge -->
+  <line x1="665" y1="135" x2="540" y2="135" stroke="#4A90D9" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="602" y="128" text-anchor="middle" font-size="9" fill="#4A90D9" font-weight="500">stdout</text>
+  <text x="602" y="148" text-anchor="middle" font-size="9" fill="#8a8a95">stream-json</text>
+
+  <!-- Claude → Skill -->
+  <line x1="770" y1="170" x2="770" y2="195" stroke="#5CB87A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="790" y="186" font-size="9" fill="#5CB87A" font-weight="500">工具调用</text>
+
+  <!-- Skill → WPS API -->
+  <line x1="770" y1="310" x2="770" y2="335" stroke="#8B5CF6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="790" y="328" font-size="9" fill="#8B5CF6" font-weight="500">HTTP API</text>
+
+  <!-- 底部说明 -->
+  <text x="450" y="405" text-anchor="middle" font-size="10" fill="#b0b0ba">所有通信在本地完成 · Bridge 仅监听 127.0.0.1 · CORS 限制 WPS 域名</text>
+</svg>

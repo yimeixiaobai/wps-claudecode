@@ -1,0 +1,78 @@
+{
+  "skill_name": "wps-airpage",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我在名为「2026年度计划」的 AirPage 文档里插入一段关于 Q1 销售目标的内容。先定位文档，再写入，再确认写入成功。",
+      "expected_output": "通过 resolve/search 定位数字 file_id，执行插入或转换+插入，使用 --verify 自动回读验证并汇报 file_id/受影响块。",
+      "files": [],
+      "expectations": [
+        "如果用户没有提供数字 file_id，先搜索文档并确认目标文档",
+        "凭据检查由 CLI 内置处理，认证失败时自动刷新重试",
+        "执行写入后用 --verify 自动验证",
+        "最终回复包含 file_id 或受影响 block_id"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "在那个 AirPage 文档里加一条评论，selection_id 你自己起，内容是「这段需要补充数据来源」，然后确认评论已经创建成功。",
+      "expected_output": "先确认目标文档和凭据，使用 comment-add 创建评论，再调用 comments 验证评论存在，并返回 selection_id 或 comment_id。",
+      "files": [],
+      "expectations": [
+        "评论操作前确认或定位 file_id",
+        "使用 comment-add 而不是手写不完整请求",
+        "创建后调用 comments 验证评论结果",
+        "回复中包含 selection_id、comment_id 或等价的确认信息"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "帮我查一下这个 kdocs 智能文档的块结构，找到第一个 heading 的 block id；如果还不知道 file_id，就先搜索文档。",
+      "expected_output": "先确认凭据与 file_id，再 query 文档结构，定位第一个 heading 的 block id，并清楚说明查找结果。",
+      "files": [],
+      "expectations": [
+        "未知 file_id 时先使用 search",
+        "使用 query 或 batch-query 获取块结构",
+        "从返回结构中明确识别 heading 块",
+        "最终回复包含找到的 block id 或清楚说明未找到"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "凭据已经超过8小时，现在帮我查一下文档「项目周报」的块结构。",
+      "expected_output": "检测到凭据过期时可以先使用现有凭据执行查询；如果认证失败，CLI 自动刷新并重试。最终完成搜索和查询。",
+      "files": [],
+      "expectations": [
+        "stale 凭据不立即阻塞查询",
+        "认证失败时自动刷新并重试一次",
+        "需要定位时优先 resolve/search，再 query",
+        "不要求用户手动导航浏览器或告知任何状态",
+        "最终回复包含块结构或明确说明未找到"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "帮我新建一个 AirPage 文档，写入三级标题「实验结论」和一段正文，然后用 outline 命令查看目录结构。",
+      "expected_output": "新建文档、写入内容后，如果 outline 返回空，不得认为写入失败或重复写入，改用 query 过滤 type=heading 块验证，并向用户说明 outline 有服务端索引延迟。",
+      "files": [],
+      "expectations": [
+        "outline 返回空时不报错、不重复写入",
+        "改用 query 过滤 type=heading 块验证内容已写入",
+        "向用户说明 outline 有服务端索引延迟，query 结果才是权威",
+        "最终回复正确展示已写入的标题和正文"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "帮我把 AirPage 文档 12345 里的第一个段落内容更新为「新内容文本」，注意这个段落上可能有评论。",
+      "expected_output": "query 块后如果发现 rangeMarkBegin/End 标记，update_content 时必须保留这些标记以维持评论锚点；计算 insert index 时需要跳过 rangeMarks。",
+      "files": [],
+      "expectations": [
+        "query 后识别并记录 rangeMarkBegin/End 标记",
+        "update_content 时把 rangeMarkBegin/End 一并带入 body",
+        "不将 rangeMarks 计入 insert index 计算",
+        "验证后确认评论未被破坏"
+      ]
+    }
+  ]
+}

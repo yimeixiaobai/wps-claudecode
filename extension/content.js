@@ -18,9 +18,13 @@
   const MAX_SESSIONS = 20;
 
   let cachedSelection = "";
+  let dismissedSelection = "";
   let isStreaming = false;
   let bridgeOnline = false;
   let abortController = null;
+  let cachedCursorFrom = 0;
+  let cachedCursorTo = 0;
+  let cachedCursorCtx = null;
 
   // ========== DOCUMENT ID (for per-document conversation isolation) ==========
   const docId = (() => {
@@ -55,15 +59,17 @@
     link: `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg>`,
     copy: `<svg viewBox="0 0 24 24" width="12" height="12"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" fill="none" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
     docWrite: `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" fill="none" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
+    quote: `<svg viewBox="0 0 16 16" width="13" height="13"><path d="M4 2v3a6 6 0 006 6h2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 9l2 2-2 2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   };
 
   // ========== FAB ==========
   const fab = document.createElement("div");
   fab.className = "cc-fab";
   fab.title = `Claude Code (${MOD_KEY}+J)`;
-  fab.innerHTML = ICON.sparkle + `<span class="cc-status-dot"></span>`;
+  fab.innerHTML = ICON.sparkle + `<span class="cc-status-dot"></span><span class="cc-update-dot"></span>`;
   document.body.appendChild(fab);
   const statusDot = fab.querySelector(".cc-status-dot");
+  const updateDot = fab.querySelector(".cc-update-dot");
 
   // ========== PANEL ==========
   const panel = document.createElement("div");
@@ -77,15 +83,12 @@
         <button class="cc-header-btn cc-close-btn" title="关闭 (Esc)">${ICON.close}</button>
       </div>
     </div>
+    <div class="cc-update-banner"></div>
     <div class="cc-session-list"></div>
     <div class="cc-messages-wrap"></div>
     <button class="cc-stop-btn">${ICON.stop} 停止生成</button>
     <div class="cc-input-area">
-      <div class="cc-quick-actions">
-        <button class="cc-quick-btn" data-prompt="总结整篇文档要点">总结全文</button>
-        <button class="cc-quick-btn" data-prompt="对这篇文档提出改进建议">提改进建议</button>
-        <button class="cc-quick-btn" data-prompt="基于上文继续续写一段">续写</button>
-      </div>
+      <div class="cc-quick-actions"></div>
       <div class="cc-linked-docs"></div>
       <div class="cc-selection-bar"></div>
       <div class="cc-input-wrapper">
@@ -119,7 +122,7 @@
   function makeConv(title) {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const container = createConvContainer();
-    return { id, claudeSessionId: null, claudeCwd: null, title: title || "新会话", container, createdAt: Date.now() };
+    return { id, claudeSessionId: null, claudeCwd: null, isImported: false, originSessionId: null, title: title || "新会话", container, createdAt: Date.now() };
   }
 
   function showConv(id) {
@@ -168,7 +171,7 @@
   function persistIndex() {
     try {
       chrome.storage.local.set({ [STORAGE_KEY]: convs.map(c => ({
-        id: c.id, claudeSessionId: c.claudeSessionId, claudeCwd: c.claudeCwd, title: c.title, createdAt: c.createdAt,
+        id: c.id, claudeSessionId: c.claudeSessionId, claudeCwd: c.claudeCwd, isImported: c.isImported, originSessionId: c.originSessionId, title: c.title, createdAt: c.createdAt,
         html: c.container.innerHTML,
       }))});
     } catch (_) {}
@@ -203,7 +206,7 @@
         rebindContainerEvents(container);
         container.style.display = "none";
         msgsWrap.appendChild(container);
-        convs.push({ id: s.id, claudeSessionId: s.claudeSessionId, claudeCwd: s.claudeCwd || null, title: s.title, container, createdAt: s.createdAt });
+        convs.push({ id: s.id, claudeSessionId: s.claudeSessionId, claudeCwd: s.claudeCwd || null, isImported: !!s.isImported, originSessionId: s.originSessionId || null, title: s.title, container, createdAt: s.createdAt });
       });
     } catch (_) {}
     if (convs.length > 0) showConv(convs[0].id);
@@ -250,7 +253,8 @@
     const listWrap = sessionListEl.querySelector(".cc-sl-list-wrap");
     if (!listWrap) return;
     try {
-      const r = await fetch(BRIDGE + "/local-sessions");
+      const excludeIds = [...new Set(convs.flatMap(c => [c.claudeSessionId, c.originSessionId]).filter(Boolean))];
+      const r = await fetch(BRIDGE + "/local-sessions?exclude=" + encodeURIComponent(excludeIds.join(",")));
       const d = await r.json();
       if (!d.ok || !d.sessions?.length) { listWrap.innerHTML = `<div class="cc-sl-empty">未找到本地 Claude 会话</div>`; return; }
       listWrap.innerHTML = "";
@@ -282,6 +286,8 @@
     const conv = makeConv(s.title);
     conv.claudeSessionId = s.sessionId;
     conv.claudeCwd = s.cwd || null;
+    conv.isImported = true;
+    conv.originSessionId = s.sessionId;
     convs.unshift(conv);
     if (convs.length > MAX_SESSIONS) { const old = convs.pop(); old.container.remove(); }
     msgsWrap.appendChild(conv.container);
@@ -338,67 +344,102 @@
   stopBtn.addEventListener("click", () => { if (abortController) { abortController.abort(); abortController = null; } });
   inputEl.addEventListener("input", () => { inputEl.style.height = "auto"; inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px"; });
 
-  // Quick action buttons
-  panel.querySelectorAll(".cc-quick-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const prompt = btn.dataset.prompt;
-      if (prompt && !isStreaming) { inputEl.value = prompt; send(); }
-    });
-  });
+  // Quick action buttons (dynamic based on selection)
+  updateQuickActions();
+  updatePlaceholder();
 
-  // ========== SELECTION ==========
-  const SEL_URL = chrome.runtime.getURL("inject-sel.js");
-  function requestSelection() { const s = document.createElement("script"); s.src = SEL_URL + "?t=" + Date.now(); s.onload = () => s.remove(); s.onerror = () => s.remove(); document.documentElement.appendChild(s); }
+  // ========== PROSEMIRROR BRIDGE (selection + cursor + direct write) ==========
+  const BRIDGE_SCRIPT_URL = chrome.runtime.getURL("inject-bridge.js");
+  (function () { const s = document.createElement("script"); s.src = BRIDGE_SCRIPT_URL; s.onload = () => s.remove(); s.onerror = () => s.remove(); document.documentElement.appendChild(s); })();
+
+  function requestSelection() { window.postMessage({ type: "__CC_READ_SEL__" }, "*"); }
   function waitForSelection() {
     return new Promise(resolve => {
       requestSelection();
       const t = setTimeout(() => resolve(cachedSelection), 200);
-      function onMsg(e) { if (e.data?.type === "__CC_SEL__") { clearTimeout(t); window.removeEventListener("message", onMsg); cachedSelection = (e.data.text || "").trim(); resolve(cachedSelection); } }
+      function onMsg(e) {
+        if (e.data?.type === "__CC_SEL__") {
+          clearTimeout(t); window.removeEventListener("message", onMsg);
+          cachedSelection = (e.data.text || "").trim();
+          cachedCursorFrom = e.data.from || 0;
+          cachedCursorTo = e.data.to || 0;
+          cachedCursorCtx = e.data.cursorContext || null;
+          resolve(cachedSelection);
+        }
+      }
       window.addEventListener("message", onMsg);
     });
   }
-  window.addEventListener("message", (e) => { if (e.data?.type === "__CC_SEL__") { cachedSelection = (e.data.text || "").trim(); if (panel.classList.contains("cc-visible")) updateSelectionBar(); } });
+  window.addEventListener("message", (e) => {
+    if (e.data?.type === "__CC_SEL__") {
+      const text = (e.data.text || "").trim();
+      if (text && text === dismissedSelection) return;
+      dismissedSelection = "";
+      cachedSelection = text;
+      cachedCursorFrom = e.data.from || 0;
+      cachedCursorTo = e.data.to || 0;
+      cachedCursorCtx = e.data.cursorContext || null;
+      if (panel.classList.contains("cc-visible")) updateSelectionBar();
+    }
+  });
   document.addEventListener("mouseup", () => { if (panel.classList.contains("cc-visible")) setTimeout(requestSelection, 50); }, true);
   document.addEventListener("keyup", (e) => { if (panel.classList.contains("cc-visible") && (e.shiftKey || e.key === "Shift")) requestSelection(); }, true);
 
   function updateSelectionBar() {
     if (cachedSelection) {
       const p = cachedSelection.length > 60 ? cachedSelection.slice(0, 60) + "…" : cachedSelection;
-      selectionBar.innerHTML = `<span class="cc-sel-quote">↵</span><span class="cc-sel-text">${esc(p)}</span><button class="cc-sel-clear">×</button>`;
+      selectionBar.innerHTML = `<span class="cc-sel-quote">${ICON.quote}</span><span class="cc-sel-text">${esc(p)}</span><button class="cc-sel-clear">×</button>`;
       selectionBar.style.display = "flex";
-      selectionBar.querySelector(".cc-sel-clear").addEventListener("click", () => { cachedSelection = ""; updateSelectionBar(); });
+      selectionBar.querySelector(".cc-sel-clear").addEventListener("click", () => { dismissedSelection = cachedSelection; cachedSelection = ""; updateSelectionBar(); });
     } else { selectionBar.innerHTML = ""; selectionBar.style.display = "none"; }
+    updateQuickActions();
+    updatePlaceholder();
+  }
+
+  function updateQuickActions() {
+    const quickEl = panel.querySelector(".cc-quick-actions");
+    const actions = cachedSelection
+      ? [{ label: "解释选中", prompt: "解释一下选中的这段内容" }, { label: "改写润色", prompt: "帮我改写润色选中的这段文字，使其更通顺、专业" }, { label: "扩写这段", prompt: "基于选中的内容，在文档中扩展补充这一段" }]
+      : [{ label: "总结全文", prompt: "总结整篇文档要点" }, { label: "提改进建议", prompt: "对这篇文档提出改进建议" }, { label: "调研补充", prompt: "根据文档主题，搜索相关资料并补充到文档中" }];
+    quickEl.innerHTML = actions.map(a => `<button class="cc-quick-btn" data-prompt="${esc(a.prompt)}">${a.label}</button>`).join("");
+    quickEl.querySelectorAll(".cc-quick-btn").forEach(btn => {
+      btn.addEventListener("click", () => { if (!isStreaming) { inputEl.value = btn.dataset.prompt; send(); } });
+    });
+  }
+
+  function updatePlaceholder() {
+    inputEl.placeholder = cachedSelection ? "对选中的内容做什么…" : "告诉我想对文档做什么…";
   }
 
   // ========== LINKED DOCS (with search) ==========
   let linkSearchTimer = null;
+  let linkExpanded = false;
 
   function renderLinkedDocs() {
     linkedDocsEl.innerHTML = "";
-    // Existing linked docs
-    if (linkedDocs.length > 0) {
-      const header = document.createElement("div");
-      header.className = "cc-link-header";
-      header.innerHTML = `<span>${ICON.link} 关联文档 (${linkedDocs.length})</span>`;
-      linkedDocsEl.appendChild(header);
-      linkedDocs.forEach((doc, i) => {
-        const item = document.createElement("div");
-        item.className = "cc-link-item";
-        item.innerHTML = `<span class="cc-link-title">${esc(doc.title || doc.url)}</span><button class="cc-link-rm">×</button>`;
-        item.querySelector(".cc-link-rm").addEventListener("click", () => { linkedDocs.splice(i, 1); renderLinkedDocs(); });
-        linkedDocsEl.appendChild(item);
-      });
-    }
-    // Search input
+    const toggleBtn = document.createElement("button");
+    toggleBtn.className = "cc-link-toggle";
+    toggleBtn.innerHTML = linkedDocs.length > 0
+      ? `${ICON.link} 关联文档 (${linkedDocs.length}) <span class="cc-link-toggle-arrow">${linkExpanded ? "▼" : "▶"}</span>`
+      : `${ICON.plus} 关联文档`;
+    toggleBtn.addEventListener("click", () => { linkExpanded = !linkExpanded; renderLinkedDocs(); });
+    linkedDocsEl.appendChild(toggleBtn);
+    if (!linkExpanded) return;
+
+    linkedDocs.forEach((doc, i) => {
+      const item = document.createElement("div");
+      item.className = "cc-link-item";
+      item.innerHTML = `<span class="cc-link-title">${esc(doc.title || doc.url)}</span><button class="cc-link-rm">×</button>`;
+      item.querySelector(".cc-link-rm").addEventListener("click", () => { linkedDocs.splice(i, 1); renderLinkedDocs(); });
+      linkedDocsEl.appendChild(item);
+    });
+
     const searchWrap = document.createElement("div");
     searchWrap.className = "cc-link-search-wrap";
     searchWrap.innerHTML = `<input class="cc-link-search" placeholder="搜索文档名称关联…" /><div class="cc-link-results"></div>`;
     linkedDocsEl.appendChild(searchWrap);
-
     const searchInput = searchWrap.querySelector(".cc-link-search");
     const resultsEl = searchWrap.querySelector(".cc-link-results");
-
-    // Load recent docs on focus
     searchInput.addEventListener("focus", () => { if (!searchInput.value.trim()) searchDocs("", resultsEl); });
     searchInput.addEventListener("input", () => {
       clearTimeout(linkSearchTimer);
@@ -455,7 +496,7 @@
   }
 
   function addMsgActions(actionsEl, replyEl) {
-    actionsEl.innerHTML = `<button class="cc-action-btn cc-copy-btn" title="复制">${ICON.copy} 复制</button><button class="cc-action-btn cc-write-btn" title="写入文档">${ICON.docWrite} 写入文档</button>`;
+    actionsEl.innerHTML = `<button class="cc-action-btn cc-copy-btn" title="复制">${ICON.copy} 复制</button><button class="cc-action-btn cc-write-btn" title="融合至文档">${ICON.docWrite} 融合至文档</button>`;
     actionsEl.querySelector(".cc-copy-btn").addEventListener("click", () => {
       const text = replyEl.innerText || replyEl.textContent;
       navigator.clipboard.writeText(text).then(() => {
@@ -464,10 +505,13 @@
       });
     });
     actionsEl.querySelector(".cc-write-btn").addEventListener("click", () => {
+      if (isStreaming) return;
       const text = replyEl.innerText || replyEl.textContent;
-      inputEl.value = `将以下内容追加写入当前文档末尾：\n\n${text.slice(0, 2000)}`;
-      inputEl.style.height = "auto"; inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
-      inputEl.focus();
+      const btn = actionsEl.querySelector(".cc-write-btn");
+      btn.innerHTML = `${ICON.docWrite} 融合中…`; btn.disabled = true;
+      inputEl.value = `将以下内容融合写入当前文档中合适的位置（根据光标位置和文档结构自行判断最佳插入点，保持原文，不要修改、总结或省略）：\n\n${text}`;
+      send();
+      setTimeout(() => { btn.innerHTML = `${ICON.docWrite} 融合至文档`; btn.disabled = false; }, 2000);
     });
   }
 
@@ -481,6 +525,15 @@
   function updateStatus(el, msg) { const l = el.querySelector('.cc-step[data-type="status"]'); if (l) l.querySelector(".cc-step-text").textContent = msg; else addStep(el, "status", msg); }
   function clearSteps(el, type) { el.querySelectorAll(`.cc-step[data-type="${type}"]`).forEach(n => n.remove()); }
   function scrollContainer(container) { requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; }); }
+
+  function humanizeError(err) {
+    if (!err) return "发生未知错误，请重试";
+    if (err.includes("超时")) return "请求处理时间过长，已自动停止，请尝试简化请求后重试";
+    if (/退出码\s*\d+/.test(err)) return "Claude 处理异常，请重试";
+    if (err.includes("SIGTERM") || err.includes("SIGKILL")) return "请求已被终止";
+    if (err.includes("无法启动")) return "无法启动 Claude，请确认 Bridge 正在运行";
+    return err;
+  }
 
   // ========== MARKDOWN ==========
   function renderMarkdown(text) {
@@ -515,10 +568,11 @@
     const container = conv.container;
     const targetClaudeSession = conv.claudeSessionId;
     const targetCwd = conv.claudeCwd;
+    const needsFork = conv.isImported && !!targetClaudeSession;
 
     inputHistory.unshift(text); if (inputHistory.length > 20) inputHistory.pop(); historyIdx = -1;
 
-    isStreaming = true; sendBtn.disabled = true; stopBtn.classList.add("cc-active");
+    isStreaming = true; sendBtn.disabled = true; stopBtn.classList.add("cc-active"); fab.classList.add("cc-streaming");
     addUserMsg(container, text);
     const { activityEl, replyEl, actionsEl } = addAssistantMsg(container);
     inputEl.value = ""; inputEl.style.height = "auto";
@@ -555,7 +609,7 @@
 
     function handleEvent(ev) {
       switch (ev.type) {
-        case "claude_session": { const c = getConv(targetConvId); if (c) c.claudeSessionId = ev.claudeSessionId; if (targetConvId === activeConvId) ; LOG("claude session:", ev.claudeSessionId); break; }
+        case "claude_session": { const c = getConv(targetConvId); if (c) { c.claudeSessionId = ev.claudeSessionId; c.isImported = false; } LOG("claude session:", ev.claudeSessionId); break; }
         case "status": updateStatus(activityEl, ev.message); break;
         case "thinking_start": clearSteps(activityEl, "status"); if (!activityEl.querySelector('.cc-step[data-type="thinking"]')) addStep(activityEl, "thinking", "思考中…"); break;
         case "thinking": break;
@@ -587,8 +641,9 @@
         case "error": {
           clearSteps(activityEl, "status"); clearSteps(activityEl, "thinking");
           if (activityEl.children.length > 0) collapseActivity();
+          const friendlyMsg = humanizeError(ev.error);
           const isTimeout = (ev.error || "").includes("超时");
-          replyEl.innerHTML = `<div class="cc-error">${esc(ev.error)}</div>`;
+          replyEl.innerHTML = `<div class="cc-error">${esc(friendlyMsg)}</div>`;
           if (isTimeout) { const btn = document.createElement("button"); btn.className = "cc-retry-btn"; btn.textContent = "重试"; btn.addEventListener("click", () => { container.removeChild(container.lastElementChild); container.removeChild(container.lastElementChild); inputEl.value = text; send(); }); replyEl.querySelector(".cc-error").appendChild(document.createElement("br")); replyEl.querySelector(".cc-error").appendChild(btn); }
           scroll(); persistIndex(); break;
         }
@@ -600,7 +655,7 @@
     try {
       const startRes = await fetch(BRIDGE + "/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request: text, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, claudeSessionId: targetClaudeSession, claudeCwd: targetCwd }),
+        body: JSON.stringify({ request: text, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, claudeSessionId: targetClaudeSession, claudeCwd: targetCwd, forkSession: needsFork, cursorPos: { from: cachedCursorFrom, to: cachedCursorTo, context: cachedCursorCtx } }),
       });
       const d = await startRes.json(); if (!d.ok) throw new Error(d.error || "启动失败");
       sessionId = d.sessionId; LOG("session:", sessionId);
@@ -641,12 +696,32 @@
         }
       }
       LOG("stopped after", polls, "polls");
-      if (accumulated && !replyEl.querySelector(".cc-md") && !replyEl.querySelector(".cc-error")) replyEl.innerHTML = renderMarkdown(accumulated);
+      activityEl.querySelectorAll(".cc-spinning").forEach(el => el.classList.remove("cc-spinning"));
+      if (currentToolStep) {
+        const ic = currentToolStep.querySelector(".cc-step-icon");
+        if (ic) { ic.className = "cc-step-icon"; ic.textContent = "⏹"; }
+        currentToolStep = null;
+      }
+      if (renderFrame) { cancelAnimationFrame(renderFrame); renderFrame = null; }
+      if (!actionsEl.querySelector(".cc-action-btn")) {
+        if (activityEl.children.length > 0 && !activityEl.querySelector(".cc-activity-summary")) {
+          collapseActivity();
+          const summary = activityEl.querySelector(".cc-activity-summary");
+          if (summary) summary.innerHTML = summary.innerHTML.replace("已完成", "已停止");
+        }
+        if (accumulated) {
+          replyEl.innerHTML = renderMarkdown(accumulated) + `<div class="cc-stopped">⏹ 已停止生成</div>`;
+          addMsgActions(actionsEl, replyEl);
+        } else if (!replyEl.querySelector(".cc-error")) {
+          replyEl.innerHTML = `<div class="cc-stopped">⏹ 已停止生成</div>`;
+        }
+        persistIndex();
+      }
     } catch (err) {
       replyEl.innerHTML = `<div class="cc-error">无法连接 Bridge，请确认已运行 <code>cd bridge && npm start</code></div>`;
     } finally {
       if (renderFrame) cancelAnimationFrame(renderFrame);
-      isStreaming = false; sendBtn.disabled = false; stopBtn.classList.remove("cc-active"); abortController = null;
+      isStreaming = false; sendBtn.disabled = false; stopBtn.classList.remove("cc-active"); fab.classList.remove("cc-streaming"); abortController = null;
       persistIndex();
     }
   }
@@ -661,8 +736,118 @@
     window.addEventListener("mouseup", () => { if (d) { d = false; document.body.style.userSelect = ""; } });
   })();
 
+  // ========== RESIZE ==========
+  (function () {
+    const handle = document.createElement("div");
+    handle.className = "cc-resize-handle";
+    panel.appendChild(handle);
+    let r = false, sx, sy, sw, sh;
+    handle.addEventListener("mousedown", (e) => {
+      r = true; const rect = panel.getBoundingClientRect();
+      sx = e.clientX; sy = e.clientY; sw = rect.width; sh = rect.height;
+      if (panel.style.right !== "auto") { panel.style.left = rect.left + "px"; panel.style.top = rect.top + "px"; panel.style.right = "auto"; panel.style.bottom = "auto"; }
+      document.body.style.userSelect = "none"; e.preventDefault(); e.stopPropagation();
+    });
+    window.addEventListener("mousemove", (e) => { if (!r) return; panel.style.width = Math.max(320, Math.min(600, sw + e.clientX - sx)) + "px"; panel.style.height = Math.max(340, Math.min(innerHeight * 0.9, sh + e.clientY - sy)) + "px"; });
+    window.addEventListener("mouseup", () => { if (r) { r = false; document.body.style.userSelect = ""; } });
+  })();
+
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+  // ========== VERSION UPDATE CHECK ==========
+  const UPDATE_CHECK_KEY = "cc_update_check";
+  const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
+  const updateBanner = panel.querySelector(".cc-update-banner");
+  let updateInfo = null;
+
+  function showUpdateBanner(info) {
+    updateDot.classList.add("cc-update-available");
+    updateBanner.innerHTML = `
+      <span class="cc-update-icon">↑</span>
+      <span class="cc-update-text">新版本 <strong>v${esc(info.latestVersion)}</strong> 可用（当前 v${esc(info.localVersion)}）</span>
+      <a class="cc-update-link" href="${esc(info.releaseUrl)}" target="_blank" rel="noopener">查看更新</a>
+      <button class="cc-update-dismiss">×</button>
+    `;
+    updateBanner.style.display = "flex";
+    updateBanner.querySelector(".cc-update-dismiss").addEventListener("click", () => {
+      updateBanner.style.display = "none";
+      updateDot.classList.remove("cc-update-available");
+      chrome.storage.local.get(UPDATE_CHECK_KEY, (d) => {
+        const data = d[UPDATE_CHECK_KEY] || {};
+        data.dismissedVersion = info.latestVersion;
+        chrome.storage.local.set({ [UPDATE_CHECK_KEY]: data });
+      });
+    });
+  }
+
+  function hideUpdateBanner() {
+    updateBanner.style.display = "none";
+    updateDot.classList.remove("cc-update-available");
+  }
+
+  async function checkForUpdate() {
+    LOG("[update] starting version check…");
+    try {
+      const data = await new Promise(r => chrome.storage.local.get(UPDATE_CHECK_KEY, r));
+      const cached = data[UPDATE_CHECK_KEY] || {};
+      const now = Date.now();
+
+      if (cached.lastCheck) {
+        const ago = Math.round((now - cached.lastCheck) / 1000);
+        LOG(`[update] last check: ${ago}s ago, cached: local=v${cached.localVersion || "?"} latest=v${cached.latestVersion || "?"} hasUpdate=${cached.hasUpdate} dismissed=${cached.dismissedVersion || "none"}`);
+      } else {
+        LOG("[update] no previous check found");
+      }
+
+      if (cached.hasUpdate && cached.dismissedVersion !== cached.latestVersion) {
+        LOG(`[update] showing cached update banner: v${cached.latestVersion}`);
+        updateInfo = cached;
+        showUpdateBanner(cached);
+      }
+
+      if (cached.lastCheck && (now - cached.lastCheck) < UPDATE_CHECK_INTERVAL) {
+        LOG(`[update] skipping fetch, next check in ${Math.round((UPDATE_CHECK_INTERVAL - (now - cached.lastCheck)) / 1000)}s`);
+        return;
+      }
+
+      LOG("[update] fetching /check-update from bridge…");
+      const r = await fetch(BRIDGE + "/check-update", { signal: AbortSignal.timeout(10000) });
+      const result = await r.json();
+      LOG("[update] bridge response:", JSON.stringify(result));
+
+      if (!result.ok) {
+        LOG("[update] bridge returned ok=false, aborting");
+        return;
+      }
+
+      const store = {
+        lastCheck: now,
+        hasUpdate: result.hasUpdate,
+        localVersion: result.localVersion,
+        latestVersion: result.latestVersion || "",
+        releaseUrl: result.releaseUrl || "",
+        changelog: result.changelog || "",
+        dismissedVersion: cached.dismissedVersion || null,
+      };
+      chrome.storage.local.set({ [UPDATE_CHECK_KEY]: store });
+
+      if (result.hasUpdate && store.dismissedVersion !== result.latestVersion) {
+        LOG(`[update] ✨ new version available: v${result.localVersion} → v${result.latestVersion}`);
+        updateInfo = store;
+        showUpdateBanner(store);
+      } else if (result.hasUpdate) {
+        LOG(`[update] update v${result.latestVersion} available but dismissed by user`);
+        hideUpdateBanner();
+      } else {
+        LOG(`[update] already up to date (v${result.localVersion})`);
+        hideUpdateBanner();
+      }
+    } catch (e) {
+      LOG("[update] check failed:", e.message);
+    }
+  }
 
   // ========== INIT ==========
   restoreIndex();
+  checkForUpdate();
 })();
