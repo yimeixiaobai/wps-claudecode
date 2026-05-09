@@ -756,7 +756,7 @@
 
   // ========== VERSION UPDATE CHECK ==========
   const UPDATE_CHECK_KEY = "cc_update_check";
-  const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
+  const UPDATE_CHECK_INTERVAL = 10 * 60 * 1000;
   const updateBanner = panel.querySelector(".cc-update-banner");
   let updateInfo = null;
 
@@ -920,4 +920,5 @@
   // ========== INIT ==========
   restoreIndex();
   checkForUpdate();
+  setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL);
 })();
