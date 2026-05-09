@@ -110,12 +110,19 @@ setInterval(() => {
 }, 60_000);
 
 // ========== Prompt builder ==========
-function buildPrompt({ request, url, title, selection, linkedDocs }) {
+function buildPrompt({ request, url, title, selection, linkedDocs, cursorPos }) {
   const ctxLines = [];
   if (title) ctxLines.push(`- 当前文档（主文档）：${title}`);
   if (url) ctxLines.push(`  链接：${url}`);
   if (selection) {
     ctxLines.push(`- 用户选中的文本：\n  """\n  ${selection.replace(/\n/g, "\n  ")}\n  """`);
+  }
+  if (cursorPos && cursorPos.from !== undefined) {
+    const posInfo = cursorPos.from === cursorPos.to
+      ? `位置 ${cursorPos.from}（光标）`
+      : `位置 ${cursorPos.from}–${cursorPos.to}（选区）`;
+    const ctxText = cursorPos.context?.parentText ? `，所在段落：「${cursorPos.context.parentText.slice(0, 80)}」` : "";
+    ctxLines.push(`- 用户光标：${posInfo}${ctxText}`);
   }
   if (Array.isArray(linkedDocs) && linkedDocs.length > 0) {
     ctxLines.push(`- 关联文档（可读取引用）：`);

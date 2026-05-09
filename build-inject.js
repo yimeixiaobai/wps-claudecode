@@ -5,17 +5,20 @@
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 
 const css = readFileSync("extension/content.css", "utf-8");
+const bridgeJs = readFileSync("extension/inject-bridge.js", "utf-8");
 let js = readFileSync("extension/content.js", "utf-8");
 
 // 1. Remove sub-frame guard (lines 2-11 approximately)
 js = js.replace(/\s*if \(window\.top !== window\) \{[\s\S]*?return;\s*\}/, "");
 
-// 2. Remove chrome.runtime.getURL and replace requestSelection
-js = js.replace(/const SEL_URL[^;]+;/, "");
+// 2. Remove chrome extension bridge injection block and replace requestSelection
 js = js.replace(
-  /function requestSelection\(\) \{[^}]*document\.documentElement\.appendChild\(s\);\s*\}/,
-  `function requestSelection() { const t = window.__CC_READ_SELECTION__(); window.postMessage({ type: "__CC_SEL__", text: t || "" }, "*"); }`
+  /\/\/ =+ PROSEMIRROR BRIDGE[\s\S]*?const BRIDGE_SCRIPT_URL[^;]+;\s*\(function \(\) \{[^}]*document\.documentElement\.appendChild\(s\);\s*\}\)\(\);/,
+  ""
 );
+
+// requestSelection now uses postMessage which works in MAIN world with the bridge listener
+// No replacement needed — the function already calls window.postMessage({ type: "__CC_READ_SEL__" })
 
 // 3. Replace chrome.storage.local.set
 js = js.replace(
@@ -33,17 +36,14 @@ js = js.replace(
 js = js.replace(/if \(window\.__CC_WPS_INJECTED__\) return;\s*window\.__CC_WPS_INJECTED__ = true;/, "");
 
 // Build final script
-// Prepend CSS injection and selection reader before the IIFE
 const output = `// Claude Code for WPS — 控制台一键注入版
 // 在 WPS协作 的 DevTools Console 中粘贴运行
 
 // CSS
 (function(){var s=document.createElement("style");s.textContent=${JSON.stringify(css)};document.head.appendChild(s)})();
 
-// Selection reader
-window.__CC_READ_SELECTION__ = function() {
-  try { var e=window.APP&&APP.core&&APP.core.editor; if(!e)return""; var s=e.selection; if(!s||s.from===s.to)return""; return(e.state&&e.state.doc&&e.state.doc.textBetween(s.from,s.to,"\\n"))||""; } catch(_){return"";}
-};
+// ProseMirror bridge (selection reading + cursor + direct doc write)
+${bridgeJs}
 
 // Main
 ${js}

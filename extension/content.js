@@ -22,6 +22,9 @@
   let isStreaming = false;
   let bridgeOnline = false;
   let abortController = null;
+  let cachedCursorFrom = 0;
+  let cachedCursorTo = 0;
+  let cachedCursorCtx = null;
 
   // ========== DOCUMENT ID (for per-document conversation isolation) ==========
   const docId = (() => {
@@ -340,14 +343,25 @@
   updateQuickActions();
   updatePlaceholder();
 
-  // ========== SELECTION ==========
-  const SEL_URL = chrome.runtime.getURL("inject-sel.js");
-  function requestSelection() { const s = document.createElement("script"); s.src = SEL_URL + "?t=" + Date.now(); s.onload = () => s.remove(); s.onerror = () => s.remove(); document.documentElement.appendChild(s); }
+  // ========== PROSEMIRROR BRIDGE (selection + cursor + direct write) ==========
+  const BRIDGE_SCRIPT_URL = chrome.runtime.getURL("inject-bridge.js");
+  (function () { const s = document.createElement("script"); s.src = BRIDGE_SCRIPT_URL; s.onload = () => s.remove(); s.onerror = () => s.remove(); document.documentElement.appendChild(s); })();
+
+  function requestSelection() { window.postMessage({ type: "__CC_READ_SEL__" }, "*"); }
   function waitForSelection() {
     return new Promise(resolve => {
       requestSelection();
       const t = setTimeout(() => resolve(cachedSelection), 200);
-      function onMsg(e) { if (e.data?.type === "__CC_SEL__") { clearTimeout(t); window.removeEventListener("message", onMsg); cachedSelection = (e.data.text || "").trim(); resolve(cachedSelection); } }
+      function onMsg(e) {
+        if (e.data?.type === "__CC_SEL__") {
+          clearTimeout(t); window.removeEventListener("message", onMsg);
+          cachedSelection = (e.data.text || "").trim();
+          cachedCursorFrom = e.data.from || 0;
+          cachedCursorTo = e.data.to || 0;
+          cachedCursorCtx = e.data.cursorContext || null;
+          resolve(cachedSelection);
+        }
+      }
       window.addEventListener("message", onMsg);
     });
   }
@@ -357,6 +371,9 @@
       if (text && text === dismissedSelection) return;
       dismissedSelection = "";
       cachedSelection = text;
+      cachedCursorFrom = e.data.from || 0;
+      cachedCursorTo = e.data.to || 0;
+      cachedCursorCtx = e.data.cursorContext || null;
       if (panel.classList.contains("cc-visible")) updateSelectionBar();
     }
   });
@@ -474,7 +491,7 @@
   }
 
   function addMsgActions(actionsEl, replyEl) {
-    actionsEl.innerHTML = `<button class="cc-action-btn cc-copy-btn" title="复制">${ICON.copy} 复制</button><button class="cc-action-btn cc-write-btn" title="写入文档">${ICON.docWrite} 写入文档</button>`;
+    actionsEl.innerHTML = `<button class="cc-action-btn cc-copy-btn" title="复制">${ICON.copy} 复制</button><button class="cc-action-btn cc-write-btn" title="融合至文档">${ICON.docWrite} 融合至文档</button>`;
     actionsEl.querySelector(".cc-copy-btn").addEventListener("click", () => {
       const text = replyEl.innerText || replyEl.textContent;
       navigator.clipboard.writeText(text).then(() => {
@@ -486,9 +503,10 @@
       if (isStreaming) return;
       const text = replyEl.innerText || replyEl.textContent;
       const btn = actionsEl.querySelector(".cc-write-btn");
-      btn.innerHTML = `${ICON.docWrite} 写入中…`; btn.disabled = true;
-      inputEl.value = `将以下内容追加写入当前文档末尾：\n\n${text}`;
+      btn.innerHTML = `${ICON.docWrite} 融合中…`; btn.disabled = true;
+      inputEl.value = `将以下内容融合写入当前文档中合适的位置（根据光标位置和文档结构自行判断最佳插入点，保持原文，不要修改、总结或省略）：\n\n${text}`;
       send();
+      setTimeout(() => { btn.innerHTML = `${ICON.docWrite} 融合至文档`; btn.disabled = false; }, 2000);
     });
   }
 
@@ -631,7 +649,7 @@
     try {
       const startRes = await fetch(BRIDGE + "/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request: text, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, claudeSessionId: targetClaudeSession, claudeCwd: targetCwd }),
+        body: JSON.stringify({ request: text, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, claudeSessionId: targetClaudeSession, claudeCwd: targetCwd, cursorPos: { from: cachedCursorFrom, to: cachedCursorTo, context: cachedCursorCtx } }),
       });
       const d = await startRes.json(); if (!d.ok) throw new Error(d.error || "启动失败");
       sessionId = d.sessionId; LOG("session:", sessionId);
