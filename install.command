@@ -176,6 +176,10 @@ cat > "$PLIST_PATH" <<PLIST
     <string>/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$(dirname "$NODE_BIN"):$PATH</string>
     <key>PORT</key>
     <string>5174</string>
+$(env | grep -iE '^(https?_proxy|no_proxy|all_proxy|ANTHROPIC_|AWS_|NODE_EXTRA_CA_CERTS|NODE_TLS_)' | while IFS='=' read -r key val; do
+  echo "    <key>$key</key>"
+  echo "    <string>$val</string>"
+done)
   </dict>
 
   <key>ThrottleInterval</key>
