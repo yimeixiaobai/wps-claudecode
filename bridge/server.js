@@ -632,6 +632,81 @@ app.get("/check-update", async (req, res) => {
   }
 });
 
+app.post("/self-update", async (req, res) => {
+  const path = await import("path");
+  const fs = await import("fs");
+  const os = await import("os");
+  const { execSync } = await import("child_process");
+
+  const projectRoot = path.resolve(import.meta.dirname || ".", "..");
+  const tmpDir = path.join(os.tmpdir(), "cc-update-" + Date.now());
+
+  try {
+    console.log(`${C.cyan}${C.bold}━━━ Self-update started ━━━${C.reset}`);
+
+    // 1. Get latest release tarball URL
+    const releaseRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+      headers: { "Accept": "application/vnd.github.v3+json", "User-Agent": "wps-claude-bridge" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!releaseRes.ok) throw new Error(`GitHub API ${releaseRes.status}`);
+    const release = await releaseRes.json();
+    const tarballUrl = release.tarball_url;
+    if (!tarballUrl) throw new Error("Release 中没有 tarball_url");
+
+    console.log(`${C.dim}   downloading ${release.tag_name}…${C.reset}`);
+
+    // 2. Download and extract tarball
+    await fs.promises.mkdir(tmpDir, { recursive: true });
+    execSync(`curl -sL "${tarballUrl}" | tar xz -C "${tmpDir}"`, { timeout: 30000 });
+
+    // Find the extracted directory (GitHub wraps in owner-repo-hash/)
+    const extracted = (await fs.promises.readdir(tmpDir))[0];
+    if (!extracted) throw new Error("解压失败：未找到文件");
+    const srcDir = path.join(tmpDir, extracted);
+
+    console.log(`${C.dim}   syncing to ${projectRoot}…${C.reset}`);
+
+    // 3. Rsync to project root, excluding runtime dirs
+    execSync(
+      `rsync -a --delete ` +
+      `--exclude='.git' ` +
+      `--exclude='node_modules' ` +
+      `--exclude='.DS_Store' ` +
+      `--exclude='bridge/node_modules' ` +
+      `--exclude='skills/WPS-AirPage-Skill/node_modules' ` +
+      `"${srcDir}/" "${projectRoot}/"`,
+      { timeout: 15000 },
+    );
+
+    console.log(`${C.green}   files synced${C.reset}`);
+
+    // 4. Cleanup temp dir
+    await fs.promises.rm(tmpDir, { recursive: true, force: true });
+
+    // 5. Spawn install.command detached (will restart bridge via launchd)
+    const installScript = path.join(projectRoot, "install.command");
+    const hasInstaller = await fs.promises.access(installScript).then(() => true).catch(() => false);
+    if (hasInstaller) {
+      console.log(`${C.dim}   launching install.command…${C.reset}`);
+      const { spawn: spawnProc } = await import("child_process");
+      const child = spawnProc("bash", [installScript], {
+        detached: true,
+        stdio: "ignore",
+        cwd: projectRoot,
+      });
+      child.unref();
+    }
+
+    console.log(`${C.green}${C.bold}━━━ Self-update done ━━━${C.reset}`);
+    res.json({ ok: true, version: (release.tag_name || "").replace(/^v/, "") });
+  } catch (err) {
+    console.error(`${C.red}self-update failed: ${err.message}${C.reset}`);
+    await fs.promises.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 app.listen(PORT, "127.0.0.1", () => {
   console.log(`${C.green}${C.bold}✅ Bridge listening on http://localhost:${PORT}${C.reset}`);
   console.log(`   CLAUDE_BIN=${CLAUDE_BIN}`);
