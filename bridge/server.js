@@ -258,6 +258,7 @@ app.get("/local-sessions", async (req, res) => {
     const path = await import("path");
     const { readdir, readFile, stat } = fs.promises;
 
+    const excludeSet = new Set((req.query.exclude || "").split(",").filter(Boolean));
     const projectsDir = path.join(os.homedir(), ".claude", "projects");
     const results = [];
 
@@ -268,11 +269,12 @@ app.get("/local-sessions", async (req, res) => {
       for (const file of files) {
         if (!file.endsWith(".jsonl")) continue;
         const sessionId = file.replace(".jsonl", "");
+        if (excludeSet.has(sessionId)) continue;
         const filePath = path.join(projPath, file);
         const fileStat = await stat(filePath).catch(() => null);
         if (!fileStat) continue;
 
-        let firstUserMsg = "", lastUserMsg = "", turns = 0, lastAssistantText = "", sessionCwd = "";
+        let firstUserMsg = "", lastUserMsg = "", turns = 0, lastAssistantText = "", sessionCwd = "", hasWpsMsg = false;
         try {
           const content = await readFile(filePath, "utf-8");
           const lines = content.split("\n").filter(Boolean);
@@ -294,6 +296,7 @@ app.get("/local-sessions", async (req, res) => {
               text = text.replace(/\n/g, " ").trim();
               if (text && !firstUserMsg) firstUserMsg = text;
               if (text) lastUserMsg = text;
+              if (text.startsWith("我正在 WPS 365")) hasWpsMsg = true;
             }
             if (d.type === "assistant" && d.message?.content) {
               for (const b of d.message.content) {
@@ -304,7 +307,7 @@ app.get("/local-sessions", async (req, res) => {
         } catch (_) { continue; }
 
         if (!firstUserMsg || turns === 0) continue;
-        if (firstUserMsg.startsWith("我正在 WPS 365")) continue;
+        if (hasWpsMsg) continue;
 
         // Title: last user message (represents current state)
         let title = lastUserMsg.slice(0, 60);
@@ -341,7 +344,7 @@ app.get("/local-sessions", async (req, res) => {
 });
 
 app.post("/start", (req, res) => {
-  const { request, claudeSessionId, claudeCwd } = req.body || {};
+  const { request, claudeSessionId, claudeCwd, forkSession } = req.body || {};
   if (!request) return res.status(400).json({ ok: false, error: "缺少 request 字段" });
 
   const session = createSession();
@@ -351,15 +354,17 @@ app.post("/start", (req, res) => {
   // since the original session may not know about this document.
   const prompt = buildPrompt(req.body);
 
-  console.log(`\n${C.cyan}${C.bold}━━━ [${session.id}] ${isResume ? "Continue" : "New"} Request ━━━${C.reset}`);
-  if (isResume) console.log(`${C.dim}   resuming claude session: ${claudeSessionId}${C.reset}`);
+  const modeLabel = isResume ? (forkSession ? "Fork" : "Continue") : "New";
+  console.log(`\n${C.cyan}${C.bold}━━━ [${session.id}] ${modeLabel} Request ━━━${C.reset}`);
+  if (isResume) console.log(`${C.dim}   ${forkSession ? "forking" : "resuming"} claude session: ${claudeSessionId}${C.reset}`);
   console.log(`${C.dim}${prompt}${C.reset}\n`);
 
   pushEvent(session, { type: "status", message: "正在启动…" });
 
   const args = ["-p", prompt, "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--dangerously-skip-permissions"];
   if (isResume) {
-    args.push("--resume", claudeSessionId, "--fork-session");
+    args.push("--resume", claudeSessionId);
+    if (forkSession) args.push("--fork-session");
   }
   // Use the session's original cwd so --resume can find it
   const spawnCwd = (isResume && claudeCwd) ? claudeCwd : process.cwd();
@@ -568,6 +573,63 @@ app.post("/stop/:id", (req, res) => {
     console.log(`${C.yellow}[${session.id}] stopped by user${C.reset}`);
   }
   res.json({ ok: true });
+});
+
+// ========== Version & Update Check ==========
+const GITHUB_REPO = "yimeixiaobai/wps-claudecode";
+
+async function getLocalVersion() {
+  const fs = await import("fs");
+  const path = await import("path");
+  const pkgPath = path.join(import.meta.dirname || ".", "package.json");
+  const pkg = JSON.parse(await fs.promises.readFile(pkgPath, "utf-8"));
+  return pkg.version;
+}
+
+function semverCompare(a, b) {
+  const pa = a.replace(/^v/, "").split(".").map(Number);
+  const pb = b.replace(/^v/, "").split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+    if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+  }
+  return 0;
+}
+
+app.get("/version", async (req, res) => {
+  try {
+    const version = await getLocalVersion();
+    res.json({ ok: true, version });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/check-update", async (req, res) => {
+  try {
+    const localVersion = await getLocalVersion();
+    const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+      headers: { "Accept": "application/vnd.github.v3+json", "User-Agent": "wps-claude-bridge" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) {
+      return res.json({ ok: true, hasUpdate: false, localVersion, error: `GitHub API ${r.status}` });
+    }
+    const release = await r.json();
+    const latestVersion = (release.tag_name || "").replace(/^v/, "");
+    const hasUpdate = semverCompare(localVersion, latestVersion) < 0;
+    res.json({
+      ok: true,
+      hasUpdate,
+      localVersion,
+      latestVersion,
+      releaseUrl: release.html_url || "",
+      changelog: (release.body || "").slice(0, 500),
+      publishedAt: release.published_at || "",
+    });
+  } catch (err) {
+    res.json({ ok: true, hasUpdate: false, localVersion: await getLocalVersion().catch(() => "?"), error: err.message });
+  }
 });
 
 app.listen(PORT, "127.0.0.1", () => {

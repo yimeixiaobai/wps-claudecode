@@ -66,9 +66,10 @@
   const fab = document.createElement("div");
   fab.className = "cc-fab";
   fab.title = `Claude Code (${MOD_KEY}+J)`;
-  fab.innerHTML = ICON.sparkle + `<span class="cc-status-dot"></span>`;
+  fab.innerHTML = ICON.sparkle + `<span class="cc-status-dot"></span><span class="cc-update-dot"></span>`;
   document.body.appendChild(fab);
   const statusDot = fab.querySelector(".cc-status-dot");
+  const updateDot = fab.querySelector(".cc-update-dot");
 
   // ========== PANEL ==========
   const panel = document.createElement("div");
@@ -82,6 +83,7 @@
         <button class="cc-header-btn cc-close-btn" title="关闭 (Esc)">${ICON.close}</button>
       </div>
     </div>
+    <div class="cc-update-banner"></div>
     <div class="cc-session-list"></div>
     <div class="cc-messages-wrap"></div>
     <button class="cc-stop-btn">${ICON.stop} 停止生成</button>
@@ -120,7 +122,7 @@
   function makeConv(title) {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const container = createConvContainer();
-    return { id, claudeSessionId: null, claudeCwd: null, title: title || "新会话", container, createdAt: Date.now() };
+    return { id, claudeSessionId: null, claudeCwd: null, isImported: false, originSessionId: null, title: title || "新会话", container, createdAt: Date.now() };
   }
 
   function showConv(id) {
@@ -169,7 +171,7 @@
   function persistIndex() {
     try {
       chrome.storage.local.set({ [STORAGE_KEY]: convs.map(c => ({
-        id: c.id, claudeSessionId: c.claudeSessionId, claudeCwd: c.claudeCwd, title: c.title, createdAt: c.createdAt,
+        id: c.id, claudeSessionId: c.claudeSessionId, claudeCwd: c.claudeCwd, isImported: c.isImported, originSessionId: c.originSessionId, title: c.title, createdAt: c.createdAt,
         html: c.container.innerHTML,
       }))});
     } catch (_) {}
@@ -204,7 +206,7 @@
         rebindContainerEvents(container);
         container.style.display = "none";
         msgsWrap.appendChild(container);
-        convs.push({ id: s.id, claudeSessionId: s.claudeSessionId, claudeCwd: s.claudeCwd || null, title: s.title, container, createdAt: s.createdAt });
+        convs.push({ id: s.id, claudeSessionId: s.claudeSessionId, claudeCwd: s.claudeCwd || null, isImported: !!s.isImported, originSessionId: s.originSessionId || null, title: s.title, container, createdAt: s.createdAt });
       });
     } catch (_) {}
     if (convs.length > 0) showConv(convs[0].id);
@@ -251,7 +253,8 @@
     const listWrap = sessionListEl.querySelector(".cc-sl-list-wrap");
     if (!listWrap) return;
     try {
-      const r = await fetch(BRIDGE + "/local-sessions");
+      const excludeIds = [...new Set(convs.flatMap(c => [c.claudeSessionId, c.originSessionId]).filter(Boolean))];
+      const r = await fetch(BRIDGE + "/local-sessions?exclude=" + encodeURIComponent(excludeIds.join(",")));
       const d = await r.json();
       if (!d.ok || !d.sessions?.length) { listWrap.innerHTML = `<div class="cc-sl-empty">未找到本地 Claude 会话</div>`; return; }
       listWrap.innerHTML = "";
@@ -283,6 +286,8 @@
     const conv = makeConv(s.title);
     conv.claudeSessionId = s.sessionId;
     conv.claudeCwd = s.cwd || null;
+    conv.isImported = true;
+    conv.originSessionId = s.sessionId;
     convs.unshift(conv);
     if (convs.length > MAX_SESSIONS) { const old = convs.pop(); old.container.remove(); }
     msgsWrap.appendChild(conv.container);
@@ -563,6 +568,7 @@
     const container = conv.container;
     const targetClaudeSession = conv.claudeSessionId;
     const targetCwd = conv.claudeCwd;
+    const needsFork = conv.isImported && !!targetClaudeSession;
 
     inputHistory.unshift(text); if (inputHistory.length > 20) inputHistory.pop(); historyIdx = -1;
 
@@ -603,7 +609,7 @@
 
     function handleEvent(ev) {
       switch (ev.type) {
-        case "claude_session": { const c = getConv(targetConvId); if (c) c.claudeSessionId = ev.claudeSessionId; if (targetConvId === activeConvId) ; LOG("claude session:", ev.claudeSessionId); break; }
+        case "claude_session": { const c = getConv(targetConvId); if (c) { c.claudeSessionId = ev.claudeSessionId; c.isImported = false; } LOG("claude session:", ev.claudeSessionId); break; }
         case "status": updateStatus(activityEl, ev.message); break;
         case "thinking_start": clearSteps(activityEl, "status"); if (!activityEl.querySelector('.cc-step[data-type="thinking"]')) addStep(activityEl, "thinking", "思考中…"); break;
         case "thinking": break;
@@ -649,7 +655,7 @@
     try {
       const startRes = await fetch(BRIDGE + "/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request: text, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, claudeSessionId: targetClaudeSession, claudeCwd: targetCwd, cursorPos: { from: cachedCursorFrom, to: cachedCursorTo, context: cachedCursorCtx } }),
+        body: JSON.stringify({ request: text, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, claudeSessionId: targetClaudeSession, claudeCwd: targetCwd, forkSession: needsFork, cursorPos: { from: cachedCursorFrom, to: cachedCursorTo, context: cachedCursorCtx } }),
       });
       const d = await startRes.json(); if (!d.ok) throw new Error(d.error || "启动失败");
       sessionId = d.sessionId; LOG("session:", sessionId);
@@ -748,6 +754,100 @@
 
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
+  // ========== VERSION UPDATE CHECK ==========
+  const UPDATE_CHECK_KEY = "cc_update_check";
+  const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
+  const updateBanner = panel.querySelector(".cc-update-banner");
+  let updateInfo = null;
+
+  function showUpdateBanner(info) {
+    updateDot.classList.add("cc-update-available");
+    updateBanner.innerHTML = `
+      <span class="cc-update-icon">↑</span>
+      <span class="cc-update-text">新版本 <strong>v${esc(info.latestVersion)}</strong> 可用（当前 v${esc(info.localVersion)}）</span>
+      <a class="cc-update-link" href="${esc(info.releaseUrl)}" target="_blank" rel="noopener">查看更新</a>
+      <button class="cc-update-dismiss">×</button>
+    `;
+    updateBanner.style.display = "flex";
+    updateBanner.querySelector(".cc-update-dismiss").addEventListener("click", () => {
+      updateBanner.style.display = "none";
+      updateDot.classList.remove("cc-update-available");
+      chrome.storage.local.get(UPDATE_CHECK_KEY, (d) => {
+        const data = d[UPDATE_CHECK_KEY] || {};
+        data.dismissedVersion = info.latestVersion;
+        chrome.storage.local.set({ [UPDATE_CHECK_KEY]: data });
+      });
+    });
+  }
+
+  function hideUpdateBanner() {
+    updateBanner.style.display = "none";
+    updateDot.classList.remove("cc-update-available");
+  }
+
+  async function checkForUpdate() {
+    LOG("[update] starting version check…");
+    try {
+      const data = await new Promise(r => chrome.storage.local.get(UPDATE_CHECK_KEY, r));
+      const cached = data[UPDATE_CHECK_KEY] || {};
+      const now = Date.now();
+
+      if (cached.lastCheck) {
+        const ago = Math.round((now - cached.lastCheck) / 1000);
+        LOG(`[update] last check: ${ago}s ago, cached: local=v${cached.localVersion || "?"} latest=v${cached.latestVersion || "?"} hasUpdate=${cached.hasUpdate} dismissed=${cached.dismissedVersion || "none"}`);
+      } else {
+        LOG("[update] no previous check found");
+      }
+
+      if (cached.hasUpdate && cached.dismissedVersion !== cached.latestVersion) {
+        LOG(`[update] showing cached update banner: v${cached.latestVersion}`);
+        updateInfo = cached;
+        showUpdateBanner(cached);
+      }
+
+      if (cached.lastCheck && (now - cached.lastCheck) < UPDATE_CHECK_INTERVAL) {
+        LOG(`[update] skipping fetch, next check in ${Math.round((UPDATE_CHECK_INTERVAL - (now - cached.lastCheck)) / 1000)}s`);
+        return;
+      }
+
+      LOG("[update] fetching /check-update from bridge…");
+      const r = await fetch(BRIDGE + "/check-update", { signal: AbortSignal.timeout(10000) });
+      const result = await r.json();
+      LOG("[update] bridge response:", JSON.stringify(result));
+
+      if (!result.ok) {
+        LOG("[update] bridge returned ok=false, aborting");
+        return;
+      }
+
+      const store = {
+        lastCheck: now,
+        hasUpdate: result.hasUpdate,
+        localVersion: result.localVersion,
+        latestVersion: result.latestVersion || "",
+        releaseUrl: result.releaseUrl || "",
+        changelog: result.changelog || "",
+        dismissedVersion: cached.dismissedVersion || null,
+      };
+      chrome.storage.local.set({ [UPDATE_CHECK_KEY]: store });
+
+      if (result.hasUpdate && store.dismissedVersion !== result.latestVersion) {
+        LOG(`[update] ✨ new version available: v${result.localVersion} → v${result.latestVersion}`);
+        updateInfo = store;
+        showUpdateBanner(store);
+      } else if (result.hasUpdate) {
+        LOG(`[update] update v${result.latestVersion} available but dismissed by user`);
+        hideUpdateBanner();
+      } else {
+        LOG(`[update] already up to date (v${result.localVersion})`);
+        hideUpdateBanner();
+      }
+    } catch (e) {
+      LOG("[update] check failed:", e.message);
+    }
+  }
+
   // ========== INIT ==========
   restoreIndex();
+  checkForUpdate();
 })();
