@@ -188,6 +188,12 @@ async function getWpsCookie() {
 // ========== Routes ==========
 app.get("/health", (_, res) => res.json({ ok: true }));
 
+app.get("/ext-path", async (_, res) => {
+  const path = await import("path");
+  const extPath = path.resolve(import.meta.dirname || ".", "..", "extension");
+  res.json({ ok: true, path: extPath });
+});
+
 // Resolve short link → numeric file ID (cached per short code)
 const shortLinkCache = new Map();
 async function resolveShortLink(shortCode, cookie) {
