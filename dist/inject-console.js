@@ -1,34 +1,24 @@
 // Claude Code for WPS — 控制台一键注入版
 // 在 WPS协作 的 DevTools Console 中粘贴运行
 
-// Chrome storage polyfill (for non-extension contexts)
+// localStorage shim for chrome.storage.local (all references rewritten to __csLocal)
 
-(function() {
-  var c = window.chrome = window.chrome || {};
-  if (!c.storage) c.storage = {};
-  if (!c.storage.local || typeof c.storage.local.get !== 'function') {
-    c.storage.local = {
-      get: function(key, cb) {
-        var r = {}; try { r[key] = JSON.parse(localStorage.getItem('_cs_' + key)); } catch(_) {}
-        if (typeof cb === 'function') { cb(r); return; }
-        return Promise.resolve(r);
-      },
-      set: function(obj, cb) {
-        Object.keys(obj).forEach(function(k) { localStorage.setItem('_cs_' + k, JSON.stringify(obj[k])); });
-        if (typeof cb === 'function') cb();
-      },
-      remove: function(key, cb) {
-        if (Array.isArray(key)) key.forEach(function(k) { localStorage.removeItem('_cs_' + k); });
-        else localStorage.removeItem('_cs_' + key);
-        if (typeof cb === 'function') cb();
-      }
-    };
+var __csLocal = {
+  get: function(key, cb) {
+    var r = {}; try { r[key] = JSON.parse(localStorage.getItem('_cs_' + key)); } catch(_) {}
+    if (typeof cb === 'function') { cb(r); return; }
+    return Promise.resolve(r);
+  },
+  set: function(obj, cb) {
+    Object.keys(obj).forEach(function(k) { localStorage.setItem('_cs_' + k, JSON.stringify(obj[k])); });
+    if (typeof cb === 'function') cb();
+  },
+  remove: function(key, cb) {
+    if (Array.isArray(key)) key.forEach(function(k) { localStorage.removeItem('_cs_' + k); });
+    else localStorage.removeItem('_cs_' + key);
+    if (typeof cb === 'function') cb();
   }
-  if (!c.storage.onChanged) c.storage.onChanged = { addListener: function() {} };
-  if (!c.runtime) c.runtime = {};
-  if (!c.runtime.getManifest) c.runtime.getManifest = function() { return { version: '0.0.0' }; };
-  if (!c.runtime.getURL) c.runtime.getURL = function(p) { return p; };
-})();
+};
 
 
 // CSS
@@ -876,10 +866,10 @@ if (window.top === window) {
     updateBanner.querySelector(".cc-update-dismiss").addEventListener("click", () => {
       updateBanner.style.display = "none";
       updateDot.classList.remove("cc-update-available");
-      chrome.storage.local.get(UPDATE_CHECK_KEY, (d) => {
+      __csLocal.get(UPDATE_CHECK_KEY, (d) => {
         const data = d[UPDATE_CHECK_KEY] || {};
         data.dismissedVersion = info.latestVersion;
-        chrome.storage.local.set({ [UPDATE_CHECK_KEY]: data });
+        __csLocal.set({ [UPDATE_CHECK_KEY]: data });
       });
     });
   }
@@ -909,7 +899,7 @@ if (window.top === window) {
       textEl.innerHTML = `已更新到 <strong>v${esc(result.version)}</strong>，正在重启…`;
       nowBtn.style.display = "none";
 
-      chrome.storage.local.remove(UPDATE_CHECK_KEY);
+      __csLocal.remove(UPDATE_CHECK_KEY);
       // 通知 service worker 开始轮询，版本变化后自动 reload 扩展
       /* cc_self_update_pending: skipped in non-extension context */
 
@@ -959,7 +949,7 @@ if (window.top === window) {
   async function checkForUpdate() {
     LOG("[update] starting version check…");
     try {
-      const data = await new Promise(r => chrome.storage.local.get(UPDATE_CHECK_KEY, r));
+      const data = await new Promise(r => __csLocal.get(UPDATE_CHECK_KEY, r));
       const cached = data[UPDATE_CHECK_KEY] || {};
       const now = Date.now();
 
@@ -1000,7 +990,7 @@ if (window.top === window) {
         changelog: result.changelog || "",
         dismissedVersion: cached.dismissedVersion || null,
       };
-      chrome.storage.local.set({ [UPDATE_CHECK_KEY]: store });
+      __csLocal.set({ [UPDATE_CHECK_KEY]: store });
 
       if (result.hasUpdate && store.dismissedVersion !== result.latestVersion) {
         LOG(`[update] ✨ new version available: v${result.localVersion} → v${result.latestVersion}`);

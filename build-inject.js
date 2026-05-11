@@ -35,34 +35,28 @@ js = js.replace(
 // 5. Remove __CC_WPS_INJECTED__ guard (our wrapper handles it)
 js = js.replace(/if \(window\.__CC_WPS_INJECTED__\) return;\s*window\.__CC_WPS_INJECTED__ = true;/, "");
 
-// 6. chrome.storage.local polyfill (covers UPDATE_CHECK_KEY and all other chrome.storage calls)
-const storagePolyfill = `
-(function() {
-  var c = window.chrome = window.chrome || {};
-  if (!c.storage) c.storage = {};
-  if (!c.storage.local || typeof c.storage.local.get !== 'function') {
-    c.storage.local = {
-      get: function(key, cb) {
-        var r = {}; try { r[key] = JSON.parse(localStorage.getItem('_cs_' + key)); } catch(_) {}
-        if (typeof cb === 'function') { cb(r); return; }
-        return Promise.resolve(r);
-      },
-      set: function(obj, cb) {
-        Object.keys(obj).forEach(function(k) { localStorage.setItem('_cs_' + k, JSON.stringify(obj[k])); });
-        if (typeof cb === 'function') cb();
-      },
-      remove: function(key, cb) {
-        if (Array.isArray(key)) key.forEach(function(k) { localStorage.removeItem('_cs_' + k); });
-        else localStorage.removeItem('_cs_' + key);
-        if (typeof cb === 'function') cb();
-      }
-    };
+// 6. Replace ALL chrome.storage.local references with inline localStorage shim.
+//    Global polyfill fails in Chromium — chrome object has read-only protections.
+//    Nuclear option: rewrite all references to use a local __csLocal variable.
+js = js.replace(/chrome\.storage\.local/g, '__csLocal');
+
+const storageShim = `
+var __csLocal = {
+  get: function(key, cb) {
+    var r = {}; try { r[key] = JSON.parse(localStorage.getItem('_cs_' + key)); } catch(_) {}
+    if (typeof cb === 'function') { cb(r); return; }
+    return Promise.resolve(r);
+  },
+  set: function(obj, cb) {
+    Object.keys(obj).forEach(function(k) { localStorage.setItem('_cs_' + k, JSON.stringify(obj[k])); });
+    if (typeof cb === 'function') cb();
+  },
+  remove: function(key, cb) {
+    if (Array.isArray(key)) key.forEach(function(k) { localStorage.removeItem('_cs_' + k); });
+    else localStorage.removeItem('_cs_' + key);
+    if (typeof cb === 'function') cb();
   }
-  if (!c.storage.onChanged) c.storage.onChanged = { addListener: function() {} };
-  if (!c.runtime) c.runtime = {};
-  if (!c.runtime.getManifest) c.runtime.getManifest = function() { return { version: '0.0.0' }; };
-  if (!c.runtime.getURL) c.runtime.getURL = function(p) { return p; };
-})();
+};
 `;
 
 // 7. Accept dynamic docUrl/docTitle from WOA relay via __CC_SEL__ messages
@@ -78,8 +72,9 @@ js = js.replace(
 );
 
 // 9. Replace browser-extension-only self-update with iframe-friendly version
+//    Note: chrome.storage.local already replaced with __csLocal in step 6
 js = js.replace(
-  'chrome.storage.local.set({ cc_self_update_pending: true });',
+  '__csLocal.set({ cc_self_update_pending: true });',
   '/* cc_self_update_pending: skipped in non-extension context */'
 );
 js = js.replace('更新完成，扩展即将自动重载…', '更新完成！即将刷新…');
@@ -102,8 +97,8 @@ js = js.replace(
 const output = `// Claude Code for WPS — 控制台一键注入版
 // 在 WPS协作 的 DevTools Console 中粘贴运行
 
-// Chrome storage polyfill (for non-extension contexts)
-${storagePolyfill}
+// localStorage shim for chrome.storage.local (all references rewritten to __csLocal)
+${storageShim}
 
 // CSS
 (function(){var s=document.createElement("style");s.textContent=${JSON.stringify(css)};document.head.appendChild(s)})();
