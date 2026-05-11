@@ -20,13 +20,13 @@ js = js.replace(
 // requestSelection now uses postMessage which works in MAIN world with the bridge listener
 // No replacement needed — the function already calls window.postMessage({ type: "__CC_READ_SEL__" })
 
-// 3. Replace chrome.storage.local.set
+// 3. Replace chrome.storage.local.set for STORAGE_KEY (conversation persistence)
 js = js.replace(
   /chrome\.storage\.local\.set\(\{ \[STORAGE_KEY\]: ([\s\S]*?)\}\);/,
   (_, inner) => `localStorage.setItem(STORAGE_KEY, JSON.stringify(${inner.trim()}));`
 );
 
-// 4. Replace chrome.storage.local.get
+// 4. Replace chrome.storage.local.get for STORAGE_KEY
 js = js.replace(
   /const data = await chrome\.storage\.local\.get\(STORAGE_KEY\);\s*const saved = data\[STORAGE_KEY\] \|\| \[\];/,
   `let saved = []; try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch(_) {}`
@@ -35,29 +35,9 @@ js = js.replace(
 // 5. Remove __CC_WPS_INJECTED__ guard (our wrapper handles it)
 js = js.replace(/if \(window\.__CC_WPS_INJECTED__\) return;\s*window\.__CC_WPS_INJECTED__ = true;/, "");
 
-// 6. Replace ALL chrome.storage.local references with inline localStorage shim.
-//    Global polyfill fails in Chromium — chrome object has read-only protections.
-//    Nuclear option: rewrite all references to use a local __csLocal variable.
+// 6. Replace ALL remaining chrome.storage.local with __csLocal shim
+//    (covers version check, update dismiss, self-update pending, etc.)
 js = js.replace(/chrome\.storage\.local/g, '__csLocal');
-
-const storageShim = `
-var __csLocal = {
-  get: function(key, cb) {
-    var r = {}; try { r[key] = JSON.parse(localStorage.getItem('_cs_' + key)); } catch(_) {}
-    if (typeof cb === 'function') { cb(r); return; }
-    return Promise.resolve(r);
-  },
-  set: function(obj, cb) {
-    Object.keys(obj).forEach(function(k) { localStorage.setItem('_cs_' + k, JSON.stringify(obj[k])); });
-    if (typeof cb === 'function') cb();
-  },
-  remove: function(key, cb) {
-    if (Array.isArray(key)) key.forEach(function(k) { localStorage.removeItem('_cs_' + k); });
-    else localStorage.removeItem('_cs_' + key);
-    if (typeof cb === 'function') cb();
-  }
-};
-`;
 
 // 7. After health check, notify parent frame (for WOA FAB status dot)
 js = js.replace(
@@ -88,7 +68,6 @@ js = js.replace(
 );
 
 // 11. Replace browser-extension-only self-update with iframe-friendly version
-//    Note: chrome.storage.local already replaced with __csLocal in step 6
 js = js.replace(
   '__csLocal.set({ cc_self_update_pending: true });',
   '/* cc_self_update_pending: skipped in non-extension context */'
@@ -99,7 +78,6 @@ js = js.replace(
   'refreshBtn.textContent = "刷新页面";',
   'refreshBtn.textContent = "刷新面板";'
 );
-// Replace the 10s wait-for-service-worker with direct reload
 js = js.replace(
   /LOG\("\[update\] bridge restarted.*?"\);/,
   'LOG("[update] bridge restarted");'
@@ -109,8 +87,28 @@ js = js.replace(
   'textEl.innerHTML = "更新完成！即将刷新…"; setTimeout(() => location.reload(), 2000); //'
 );
 
+// __csLocal shim definition
+const storageShim = `
+var __csLocal = {
+  get: function(key, cb) {
+    var r = {}; try { r[key] = JSON.parse(localStorage.getItem('_cs_' + key)); } catch(_) {}
+    if (typeof cb === 'function') { cb(r); return; }
+    return Promise.resolve(r);
+  },
+  set: function(obj, cb) {
+    Object.keys(obj).forEach(function(k) { localStorage.setItem('_cs_' + k, JSON.stringify(obj[k])); });
+    if (typeof cb === 'function') cb();
+  },
+  remove: function(key, cb) {
+    if (Array.isArray(key)) key.forEach(function(k) { localStorage.removeItem('_cs_' + k); });
+    else localStorage.removeItem('_cs_' + key);
+    if (typeof cb === 'function') cb();
+  }
+};
+`;
+
 // Build final script
-const output = `// Claude Code for WPS — 控制台一键注入版
+const output = `// Claude Code for WPS — 控制台注入版
 // 在 WPS协作 的 DevTools Console 中粘贴运行
 
 // localStorage shim for chrome.storage.local (all references rewritten to __csLocal)
