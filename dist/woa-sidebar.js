@@ -144,30 +144,19 @@
     }
   }
 
-  // ── Bridge 在线检测 ──
-  var bridgeOnline = false;
-  function checkHealth() {
-    fetch(BRIDGE + '/health', { signal: AbortSignal.timeout(3000) })
-      .then(function (r) { return r.json(); })
-      .then(function (d) { bridgeOnline = !!d.ok; })
-      .catch(function () { bridgeOnline = false; })
-      .finally(function () {
-        var dot = document.querySelector('#' + fabId + ' .cc-status-dot');
-        if (dot) dot.className = 'cc-status-dot ' + (bridgeOnline ? 'cc-online' : 'cc-offline');
-      });
-  }
-
-  // ── 版本更新检测 ──
-  function checkUpdate() {
-    fetch(BRIDGE + '/check-update', { signal: AbortSignal.timeout(10000) })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        var dot = document.querySelector('#' + fabId + ' .cc-update-dot');
-        if (dot && d.ok && d.hasUpdate) dot.classList.add('cc-update-available');
-        else if (dot) dot.classList.remove('cc-update-available');
-      })
-      .catch(function () {});
-  }
+  // ── 状态点由 iframe 内的检测结果驱动（外壳 file:// 无法直接 fetch Bridge）──
+  window.addEventListener('message', function (e) {
+    if (!e.data || typeof e.data !== 'object') return;
+    if (e.data.type === '__CC_HEALTH__') {
+      var dot = document.querySelector('#' + fabId + ' .cc-status-dot');
+      if (dot) dot.className = 'cc-status-dot ' + (e.data.online ? 'cc-online' : 'cc-offline');
+    }
+    if (e.data.type === '__CC_UPDATE__') {
+      var dot = document.querySelector('#' + fabId + ' .cc-update-dot');
+      if (dot && e.data.hasUpdate) dot.classList.add('cc-update-available');
+      else if (dot) dot.classList.remove('cc-update-available');
+    }
+  });
 
   // ── 从活跃 webview 读选区并推送给 iframe ──
   function relaySelection(frame) {
@@ -348,12 +337,6 @@
     };
     window.addEventListener('message', msgHandler);
     window.__cc_woa_msg_handler__ = msgHandler;
-
-    checkHealth();
-    timers.push(setInterval(checkHealth, 30000));
-
-    checkUpdate();
-    timers.push(setInterval(checkUpdate, 10 * 60 * 1000));
 
     window[relayKey] = timers;
   }

@@ -567,7 +567,7 @@ if (window.top === window) {
   renderLinkedDocs();
 
   // ========== HEALTH ==========
-  async function checkHealth() { try { const r = await fetch(BRIDGE + "/health", { signal: AbortSignal.timeout(3000) }); bridgeOnline = !!(await r.json()).ok; } catch (_) { bridgeOnline = false; } statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline"); }
+  async function checkHealth() { try { const r = await fetch(BRIDGE + "/health", { signal: AbortSignal.timeout(3000) }); bridgeOnline = !!(await r.json()).ok; } catch (_) { bridgeOnline = false; } statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline"); try { if (window.parent !== window) window.parent.postMessage({ type: "__CC_HEALTH__", online: bridgeOnline }, "*"); } catch(_) {} }
 
   // ========== HELPERS ==========
   function getWelcomeHTML() { return `<div class="cc-welcome"><div class="cc-welcome-title">Claude Code</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-shortcuts"><span><kbd>${MOD_KEY}</kbd>+<kbd>J</kbd> 打开</span><span><kbd>↵</kbd> 发送</span></div></div>`; }
@@ -852,7 +852,7 @@ if (window.top === window) {
   const updateBanner = panel.querySelector(".cc-update-banner");
   let updateInfo = null;
 
-  function showUpdateBanner(info) {
+  function showUpdateBanner(info) { try { if (window.parent !== window) window.parent.postMessage({ type: "__CC_UPDATE__", hasUpdate: true }, "*"); } catch(_) {}
     updateDot.classList.add("cc-update-available");
     updateBanner.innerHTML = `
       <span class="cc-update-icon">↑</span>
@@ -941,7 +941,7 @@ if (window.top === window) {
     }
   }
 
-  function hideUpdateBanner() {
+  function hideUpdateBanner() { try { if (window.parent !== window) window.parent.postMessage({ type: "__CC_UPDATE__", hasUpdate: false }, "*"); } catch(_) {}
     updateBanner.style.display = "none";
     updateDot.classList.remove("cc-update-available");
   }

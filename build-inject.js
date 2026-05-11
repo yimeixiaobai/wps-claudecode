@@ -59,19 +59,35 @@ var __csLocal = {
 };
 `;
 
-// 7. Accept dynamic docUrl/docTitle from WOA relay via __CC_SEL__ messages
+// 7. After health check, notify parent frame (for WOA FAB status dot)
+js = js.replace(
+  'statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline");',
+  'statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline"); try { if (window.parent !== window) window.parent.postMessage({ type: "__CC_HEALTH__", online: bridgeOnline }, "*"); } catch(_) {}'
+);
+
+// 8. After update check, notify parent frame (for WOA FAB update dot)
+js = js.replace(
+  'function showUpdateBanner(info) {',
+  'function showUpdateBanner(info) { try { if (window.parent !== window) window.parent.postMessage({ type: "__CC_UPDATE__", hasUpdate: true }, "*"); } catch(_) {}'
+);
+js = js.replace(
+  'function hideUpdateBanner() {',
+  'function hideUpdateBanner() { try { if (window.parent !== window) window.parent.postMessage({ type: "__CC_UPDATE__", hasUpdate: false }, "*"); } catch(_) {}'
+);
+
+// 9. Accept dynamic docUrl/docTitle from WOA relay via __CC_SEL__ messages
 js = js.replace(
   'if (panel.classList.contains("cc-visible")) updateSelectionBar();',
   'if (e.data.docUrl) { window.__CC_DOC_URL__ = e.data.docUrl; window.__CC_DOC_TITLE__ = e.data.docTitle || ""; }\n      if (panel.classList.contains("cc-visible")) updateSelectionBar();'
 );
 
-// 8. Make requestSelection also notify parent frame (for WOA relay mode)
+// 10. Make requestSelection also notify parent frame (for WOA relay mode)
 js = js.replace(
   'function requestSelection() { window.postMessage({ type: "__CC_READ_SEL__" }, "*"); }',
   'function requestSelection() { window.postMessage({ type: "__CC_READ_SEL__" }, "*"); try { if (window.parent !== window) window.parent.postMessage({ type: "__CC_READ_SEL__" }, "*"); } catch(_) {} }'
 );
 
-// 9. Replace browser-extension-only self-update with iframe-friendly version
+// 11. Replace browser-extension-only self-update with iframe-friendly version
 //    Note: chrome.storage.local already replaced with __csLocal in step 6
 js = js.replace(
   '__csLocal.set({ cc_self_update_pending: true });',
