@@ -35,15 +35,81 @@ js = js.replace(
 // 5. Remove __CC_WPS_INJECTED__ guard (our wrapper handles it)
 js = js.replace(/if \(window\.__CC_WPS_INJECTED__\) return;\s*window\.__CC_WPS_INJECTED__ = true;/, "");
 
+// 6. chrome.storage.local polyfill (covers UPDATE_CHECK_KEY and all other chrome.storage calls)
+const storagePolyfill = `
+if (typeof chrome === 'undefined' || !chrome?.storage?.local) {
+  var _cs = (window.chrome = window.chrome || {});
+  _cs.storage = _cs.storage || {};
+  _cs.storage.local = {
+    get: function(key, cb) {
+      var r = {}; try { r[key] = JSON.parse(localStorage.getItem('_cs_' + key)); } catch(_) {}
+      if (typeof cb === 'function') { cb(r); return; }
+      return Promise.resolve(r);
+    },
+    set: function(obj, cb) {
+      Object.keys(obj).forEach(function(k) { localStorage.setItem('_cs_' + k, JSON.stringify(obj[k])); });
+      if (typeof cb === 'function') cb();
+    },
+    remove: function(key, cb) {
+      if (Array.isArray(key)) key.forEach(function(k) { localStorage.removeItem('_cs_' + k); });
+      else localStorage.removeItem('_cs_' + key);
+      if (typeof cb === 'function') cb();
+    }
+  };
+  _cs.storage.onChanged = { addListener: function() {} };
+  _cs.runtime = _cs.runtime || {};
+  if (!_cs.runtime.getManifest) _cs.runtime.getManifest = function() { return { version: '0.0.0' }; };
+  if (!_cs.runtime.getURL) _cs.runtime.getURL = function(p) { return p; };
+}
+`;
+
+// 7. Accept dynamic docUrl/docTitle from WOA relay via __CC_SEL__ messages
+js = js.replace(
+  'if (panel.classList.contains("cc-visible")) updateSelectionBar();',
+  'if (e.data.docUrl) { window.__CC_DOC_URL__ = e.data.docUrl; window.__CC_DOC_TITLE__ = e.data.docTitle || ""; }\n      if (panel.classList.contains("cc-visible")) updateSelectionBar();'
+);
+
+// 8. Make requestSelection also notify parent frame (for WOA relay mode)
+js = js.replace(
+  'function requestSelection() { window.postMessage({ type: "__CC_READ_SEL__" }, "*"); }',
+  'function requestSelection() { window.postMessage({ type: "__CC_READ_SEL__" }, "*"); try { if (window.parent !== window) window.parent.postMessage({ type: "__CC_READ_SEL__" }, "*"); } catch(_) {} }'
+);
+
+// 9. Replace browser-extension-only self-update with iframe-friendly version
+js = js.replace(
+  'chrome.storage.local.set({ cc_self_update_pending: true });',
+  '/* cc_self_update_pending: skipped in non-extension context */'
+);
+js = js.replace('更新完成，扩展即将自动重载…', '更新完成！即将刷新…');
+js = js.replace('更新完成！请刷新页面以加载新版扩展。', '更新完成！请手动刷新面板。');
+js = js.replace(
+  'refreshBtn.textContent = "刷新页面";',
+  'refreshBtn.textContent = "刷新面板";'
+);
+// Replace the 10s wait-for-service-worker with direct reload
+js = js.replace(
+  /LOG\("\[update\] bridge restarted.*?"\);/,
+  'LOG("[update] bridge restarted");'
+);
+js = js.replace(
+  /textEl\.innerHTML = "更新完成！即将刷新…";\s*\/\/ 兜底/,
+  'textEl.innerHTML = "更新完成！即将刷新…"; setTimeout(() => location.reload(), 2000); //'
+);
+
 // Build final script
 const output = `// Claude Code for WPS — 控制台一键注入版
 // 在 WPS协作 的 DevTools Console 中粘贴运行
 
+// Chrome storage polyfill (for non-extension contexts)
+${storagePolyfill}
+
 // CSS
 (function(){var s=document.createElement("style");s.textContent=${JSON.stringify(css)};document.head.appendChild(s)})();
 
-// ProseMirror bridge (selection reading + cursor + direct doc write)
+// ProseMirror bridge — only in top frame (in iframe/WOA, the relay handles selection)
+if (window.top === window) {
 ${bridgeJs}
+}
 
 // Main
 ${js}
