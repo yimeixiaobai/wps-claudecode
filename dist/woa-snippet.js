@@ -214,7 +214,7 @@
       '#' + fabId + ' .cc-status-dot{position:absolute;top:-1px;right:-1px;width:9px;height:9px;border-radius:50%;background:#b0b0ba;border:2px solid #fff;z-index:1;transition:background 0.3s;box-sizing:border-box}',
       '#' + fabId + ' .cc-status-dot.cc-online{background:#5cb87a}',
       '#' + fabId + ' .cc-status-dot.cc-offline{background:#e05c5c}',
-      '#' + fabId + ' .cc-update-dot{position:absolute;top:-3px;left:-3px;width:10px;height:10px;border-radius:50%;background:#e05c5c;border:2px solid #fff;z-index:2;display:none;box-sizing:border-box}',
+      '#' + fabId + ' .cc-update-dot{position:absolute;top:-1px;left:-1px;width:9px;height:9px;border-radius:50%;background:#e05c5c;border:2px solid #fff;z-index:2;display:none;box-sizing:border-box}',
       '#' + fabId + ' .cc-update-dot.cc-update-available{display:block}',
       '#' + frameId + '{position:fixed;right:16px;bottom:80px;width:420px;height:560px;border:none;z-index:99998;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.12);display:none}',
       '#' + frameId + '.cc-show{display:block}'
