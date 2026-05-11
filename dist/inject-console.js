@@ -3,30 +3,32 @@
 
 // Chrome storage polyfill (for non-extension contexts)
 
-if (typeof chrome === 'undefined' || !chrome?.storage?.local) {
-  var _cs = (window.chrome = window.chrome || {});
-  _cs.storage = _cs.storage || {};
-  _cs.storage.local = {
-    get: function(key, cb) {
-      var r = {}; try { r[key] = JSON.parse(localStorage.getItem('_cs_' + key)); } catch(_) {}
-      if (typeof cb === 'function') { cb(r); return; }
-      return Promise.resolve(r);
-    },
-    set: function(obj, cb) {
-      Object.keys(obj).forEach(function(k) { localStorage.setItem('_cs_' + k, JSON.stringify(obj[k])); });
-      if (typeof cb === 'function') cb();
-    },
-    remove: function(key, cb) {
-      if (Array.isArray(key)) key.forEach(function(k) { localStorage.removeItem('_cs_' + k); });
-      else localStorage.removeItem('_cs_' + key);
-      if (typeof cb === 'function') cb();
-    }
-  };
-  _cs.storage.onChanged = { addListener: function() {} };
-  _cs.runtime = _cs.runtime || {};
-  if (!_cs.runtime.getManifest) _cs.runtime.getManifest = function() { return { version: '0.0.0' }; };
-  if (!_cs.runtime.getURL) _cs.runtime.getURL = function(p) { return p; };
-}
+(function() {
+  var c = window.chrome = window.chrome || {};
+  if (!c.storage) c.storage = {};
+  if (!c.storage.local || typeof c.storage.local.get !== 'function') {
+    c.storage.local = {
+      get: function(key, cb) {
+        var r = {}; try { r[key] = JSON.parse(localStorage.getItem('_cs_' + key)); } catch(_) {}
+        if (typeof cb === 'function') { cb(r); return; }
+        return Promise.resolve(r);
+      },
+      set: function(obj, cb) {
+        Object.keys(obj).forEach(function(k) { localStorage.setItem('_cs_' + k, JSON.stringify(obj[k])); });
+        if (typeof cb === 'function') cb();
+      },
+      remove: function(key, cb) {
+        if (Array.isArray(key)) key.forEach(function(k) { localStorage.removeItem('_cs_' + k); });
+        else localStorage.removeItem('_cs_' + key);
+        if (typeof cb === 'function') cb();
+      }
+    };
+  }
+  if (!c.storage.onChanged) c.storage.onChanged = { addListener: function() {} };
+  if (!c.runtime) c.runtime = {};
+  if (!c.runtime.getManifest) c.runtime.getManifest = function() { return { version: '0.0.0' }; };
+  if (!c.runtime.getURL) c.runtime.getURL = function(p) { return p; };
+})();
 
 
 // CSS
