@@ -81,7 +81,17 @@ wps-cc/
 - Node.js 18+
 - Claude Code CLI（`claude --version` 可用）
 
-#### 1. 启动 Bridge
+#### 1. 部署 WPS-AirPage-Skill
+
+将 Skill 复制到 Claude Code 的 skills 目录，并安装依赖：
+
+```bash
+mkdir -p ~/.claude/skills
+cp -R skills/WPS-AirPage-Skill ~/.claude/skills/
+cd ~/.claude/skills/WPS-AirPage-Skill && npm install --production
+```
+
+#### 2. 启动 Bridge
 
 **方式 A（推荐）：** 在 Finder 中双击 `bridge/start-bridge.command`
 
@@ -92,7 +102,7 @@ cd bridge && npm install && npm start
 
 > 停止：关闭终端窗口，或双击 `bridge/stop-bridge.command`
 
-#### 2. 安装客户端
+#### 3. 安装客户端
 
 根据你的使用环境选择一种方式：
 
@@ -106,12 +116,12 @@ cd bridge && npm install && npm start
 **方式 B：WPS协作 桌面客户端（WOA）**
 
 WOA 不支持浏览器扩展，通过 DevTools Snippet 注入：
-
-1. 在 WOA 中按 **F12** 打开 DevTools
-2. 切到 **Sources（源代码）** → 左侧 **Snippets（代码段）**
-3. 点 **+ New snippet**，命名为 `Claude Code`
-4. 把 `dist/woa-snippet.js` 的内容粘贴进去，**Ctrl+S** 保存
-5. 右键该 snippet → **Run**（或 Ctrl+Enter）
+1. 请先打开协作的调试模式
+2. 点击打开Console控制台
+3. 切到 **Sources（源代码）** → 左侧 **Snippets（代码段）**
+4. 点 **+ New snippet**，命名为 `Claude Code`
+5. 把 `dist/woa-snippet.js` 的内容粘贴进去，**Ctrl+S** 保存
+6. 右键该 snippet → **Run**（或 Ctrl+Enter）
 
 > 以后每次打开 WOA 只需：Sources → Snippets → 右键 Claude Code → Run
 >
@@ -121,7 +131,27 @@ WOA 不支持浏览器扩展，通过 DevTools Snippet 注入：
 
 在 DevTools Console 中粘贴 `dist/inject-console.js` 的内容即可注入完整面板。适用于有控制台访问权限但无法安装扩展的环境。
 
-### 3. 使用
+### 安装后验证（一键安装和手动安装均需完成）
+
+#### 1. 检查 Skill 安装状态
+
+打开 Claude Code，输入 `/wps`，如果显示出 `wps-airpage` Skill 即为安装成功：
+
+![Skill 检测](docs/skill-check.png)
+
+#### 2. 获取个人 Cookies（首次必做）
+
+在 Claude Code 中输入：
+
+```
+/WPS-AirPage-Skill 请帮我登录下
+```
+
+Skill 会自动打开 WPS 认证界面，完成登录后凭据保存到 `~/.claude/secrets/wps365.json`。
+
+> **首次安装耗时提示：** 首次运行需要下载 Playwright + Chromium 内核（约 150 MB），请耐心等待。下载完成后会自动弹出 WPS 登录页面，登录即可。后续使用无需重复下载。
+
+### 使用
 
 - 点 **CC 按钮** 或按 **Alt+J**（浏览器扩展）打开面板
 - 在文档中选中文字，面板输入框上方自动显示选区引用
