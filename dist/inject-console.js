@@ -412,7 +412,7 @@ if (window.top === window) {
 
   // ========== KEYBOARD ==========
   window.addEventListener("keydown", (e) => {
-    if (e.altKey && (e.key === "j" || e.key === "J")) { e.preventDefault(); panel.classList.contains("cc-visible") ? hidePanel() : showPanel(); }
+    if (e.altKey && e.code === "KeyJ") { e.preventDefault(); panel.classList.contains("cc-visible") ? hidePanel() : showPanel(); }
     if (e.key === "Escape" && panel.classList.contains("cc-visible")) hidePanel();
   });
   let inputHistory = [];

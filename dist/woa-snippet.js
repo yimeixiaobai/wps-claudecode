@@ -76,6 +76,7 @@
     '  document.addEventListener("selectionchange",u,true);',
     '  document.addEventListener("mouseup",function(){setTimeout(u,50)},true);',
     '  document.addEventListener("keyup",function(e){if(e.shiftKey||e.key==="Shift")u()},true);',
+    '  window.addEventListener("keydown",function(e){if(e.altKey&&e.code==="KeyJ"){e.preventDefault();console.log("__CC_TOGGLE__")}},true);',
     '  u();',
     '})()'
   ].join('\n');
@@ -89,6 +90,19 @@
       .catch(function () {});
     wv.addEventListener('did-finish-load', function () {
       wv.executeJavaScript(bridgeCode).catch(function () {});
+    });
+    wv.addEventListener('console-message', function (e) {
+      if (e.message === '__CC_TOGGLE__') {
+        var frame = document.getElementById(frameId);
+        if (frame) frame.classList.toggle('cc-show');
+      }
+    });
+    wv.addEventListener('before-input-event', function (e) {
+      if (e.alt && e.code === 'KeyJ') {
+        e.preventDefault();
+        var frame = document.getElementById(frameId);
+        if (frame) frame.classList.toggle('cc-show');
+      }
     });
   }
 
@@ -231,7 +245,7 @@
 
     // ── 快捷键：Alt+J 切换面板，Esc 关闭 ──
     window.addEventListener('keydown', function (e) {
-      if (e.altKey && (e.key === 'j' || e.key === 'J')) {
+      if (e.altKey && e.code === 'KeyJ') {
         e.preventDefault();
         frame.classList.toggle('cc-show');
       }
