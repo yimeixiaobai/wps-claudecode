@@ -2,6 +2,7 @@
 (function () {
   if (window.top !== window) {
     try { document.addEventListener("copy", (e) => { const t = (e.clipboardData || window.clipboardData)?.getData("text/plain"); if (t && t.trim() && window.top) window.top.postMessage({ type: "__CC_SELECTION__", text: t.trim() }, "*"); }, true); } catch (_) {}
+    try { window.addEventListener("keydown", (e) => { if (e.altKey && e.code === "KeyJ") { e.preventDefault(); window.top.postMessage({ type: "__CC_TOGGLE__" }, "*"); } }, true); } catch (_) {}
     return;
   }
   if (window.__CC_WPS_INJECTED__) return;
@@ -319,7 +320,7 @@
 
   // ========== KEYBOARD ==========
   window.addEventListener("keydown", (e) => {
-    if (e.altKey && (e.key === "j" || e.key === "J")) { e.preventDefault(); panel.classList.contains("cc-visible") ? hidePanel() : showPanel(); }
+    if (e.altKey && e.code === "KeyJ") { e.preventDefault(); panel.classList.contains("cc-visible") ? hidePanel() : showPanel(); }
     if (e.key === "Escape" && panel.classList.contains("cc-visible")) hidePanel();
   });
   let inputHistory = [];
@@ -371,6 +372,9 @@
     });
   }
   window.addEventListener("message", (e) => {
+    if (e.data?.type === "__CC_TOGGLE__") {
+      panel.classList.contains("cc-visible") ? hidePanel() : showPanel();
+    }
     if (e.data?.type === "__CC_SEL__") {
       const text = (e.data.text || "").trim();
       if (text && text === dismissedSelection) return;
