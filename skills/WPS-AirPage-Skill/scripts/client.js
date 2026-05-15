@@ -206,6 +206,7 @@ class AirpageClient {
     const docUrl = `https://365.kdocs.cn/office/o/${fileId}`;
 
     // 设置文档内部标题块（index 0 的 title 块默认为空）
+    let titleWarning;
     try {
       const root = await this.queryBlocks(fileId, 'doc');
       const children = root?.detail?.result?.blocks?.[0]?.content ?? [];
@@ -217,9 +218,14 @@ class AirpageClient {
           content: [{ type: 'text', content: name }],
         }]);
       }
-    } catch { /* 标题设置失败不影响主流程 */ }
+    } catch (e) {
+      titleWarning = `标题块写入失败: ${e.message}`;
+      console.error(`⚠ ${titleWarning}`);
+    }
 
-    return { result: 'ok', fileid: fileId, doc_url: docUrl };
+    const res = { result: 'ok', fileid: fileId, doc_url: docUrl };
+    if (titleWarning) res.warning = titleWarning;
+    return res;
   }
 
   // ── 块操作快捷方法 ────────────────────────────────
