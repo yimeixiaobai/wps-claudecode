@@ -47,7 +47,7 @@ async function uploadAttachment(fileId, filePath, cookie) {
     throw new AirpageError(`获取上传地址失败 [${addrData.errno}]: ${addrData.result || addrData.msg}`);
   }
 
-  const { request: storeReq, upload_id } = addrData;
+  const { request: storeReq, upload_id, send_back_params } = addrData;
 
   // Step 2: 上传文件二进制到存储服务器
   const storeRes = await fetch(storeReq.url, {
@@ -59,10 +59,19 @@ async function uploadAttachment(fileId, filePath, cookie) {
     throw new AirpageError(`存储服务器上传失败 [${storeRes.status}]`);
   }
 
-  const etag = (storeRes.headers.get('etag') || '').replace(/"/g, '');
-  const key = storeRes.headers.get('x-obs-save-key') || '';
+  const etagSpec = send_back_params?.etag || 'header.ETag';
+  const keySpec = send_back_params?.key || 'header.x-obs-save-key';
+  const extractHeader = (spec) => {
+    const name = spec.replace(/^header\./i, '');
+    return (storeRes.headers.get(name) || '').replace(/"/g, '');
+  };
+  const etag = extractHeader(etagSpec);
+  const key = extractHeader(keySpec);
   if (!etag || !key) {
-    throw new AirpageError('存储服务器未返回 etag 或 x-obs-save-key');
+    const received = [...storeRes.headers.keys()].join(', ');
+    throw new AirpageError(
+      `存储服务器未返回所需头 — etag(${etagSpec})=${etag || '空'}, key(${keySpec})=${key || '空'}; 实际headers: ${received}`
+    );
   }
 
   // Step 3: 提交上传完成

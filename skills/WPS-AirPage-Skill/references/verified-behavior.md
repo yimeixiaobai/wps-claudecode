@@ -61,7 +61,7 @@
 5. inline 文本节点字段是 `content`，不是 `text`。
 6. `delete_table_rows` / `delete_table_columns` 使用 `start` + `count`。
 7. `replace_anchor` 的 `content` 需要 `{"type": "...", "attrs": {...}}` 结构。
-8. 附件上传端点必须加 `Origin: https://365.kdocs.cn`，否则可能返回 `SessionDeleted`。
+8. 附件上传端点必须加 `Origin: https://365.kdocs.cn`，否则可能返回 `SessionDeleted`。附件上传 Step 1 返回的 `send_back_params` 指定了 Step 2 响应中的 header 映射（如 `header.newfilename`），代码必须动态解析，不可硬编码 header 名。
 9. 更新评论时必须传 `selection_id`，否则会报 `selection id invalid`。
 10. 凭据 stale 不等于失效；CLI 会先继续请求，遇到认证类错误再自动刷新并重试一次。
 
