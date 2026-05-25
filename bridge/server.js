@@ -518,9 +518,32 @@ const ENGINES = {
 
     createHandler(session) {
       let lastAgentText = "";
+      let thinking = false;
+
+      function endThinking() {
+        if (thinking) { thinking = false; pushEvent(session, { type: "thinking_done" }); }
+      }
+
+      const CMD_LABELS = {
+        ls: "查看目录", find: "查找文件", tree: "查看目录", rg: "搜索内容", grep: "搜索内容", ag: "搜索内容",
+        cat: "读取文件", head: "读取文件", tail: "读取文件", sed: "读取文件", less: "读取文件", bat: "读取文件", wc: "读取文件",
+        node: "执行脚本", python: "执行脚本", python3: "执行脚本", ruby: "执行脚本", sh: "执行脚本", bash: "执行脚本",
+        git: "Git 操作", npm: "包管理", npx: "包管理", pnpm: "包管理", yarn: "包管理",
+        mkdir: "创建目录", touch: "创建文件", cp: "复制文件", mv: "移动文件", rm: "删除文件",
+        curl: "网络请求", wget: "网络请求",
+      };
+
+      function parseCmd(raw) {
+        const m = raw.match(/^\/bin\/(?:zsh|bash|sh)\s+-\w*c\s+["']?([\s\S]*?)["']?$/);
+        const inner = m ? m[1] : raw;
+        const first = inner.trim().split(/\s+/)[0].replace(/^["']|["']$/g, "");
+        const base = first.split("/").pop();
+        const label = CMD_LABELS[base] || "执行命令";
+        const short = inner.length > 80 ? inner.slice(0, 80) + "…" : inner;
+        return { label, base, short };
+      }
+
       return function (obj) {
-        // codex exec --json real format: thread.started, turn.started,
-        // item.started/completed (agent_message | command_execution), turn.completed
         if (obj.type === "thread.started") {
           const sid = obj.thread_id || "";
           console.log(`${C.blue}⚙ codex thread=${sid}${C.reset}`);
@@ -529,36 +552,42 @@ const ENGINES = {
 
         if (obj.type === "turn.started") {
           pushEvent(session, { type: "status", message: "Codex 正在处理…" });
+          thinking = true;
+          pushEvent(session, { type: "thinking_start" });
         }
 
         if (obj.type === "item.started") {
           const item = obj.item || {};
           if (item.type === "command_execution") {
-            const cmd = item.command || "shell";
-            console.log(`\n${C.magenta}🔧 ${cmd}${C.reset}`);
-            pushEvent(session, { type: "tool_start", name: cmd, id: item.id });
+            endThinking();
+            const p = parseCmd(item.command || "shell");
+            console.log(`\n${C.magenta}🔧 ${p.base}${C.reset}`);
+            pushEvent(session, { type: "tool_start", name: p.label, id: item.id });
+            pushEvent(session, { type: "tool_detail", text: p.short });
           }
         }
 
         if (obj.type === "item.completed") {
           const item = obj.item || {};
           if (item.type === "agent_message" && item.text) {
+            endThinking();
+            if (!lastAgentText) pushEvent(session, { type: "status", message: "正在回复…" });
             process.stdout.write(item.text + "\n");
             pushEvent(session, { type: "delta", text: item.text });
             lastAgentText = item.text;
           }
           if (item.type === "command_execution") {
-            const cmd = item.command || "shell";
+            const p = parseCmd(item.command || "shell");
             const isErr = item.exit_code !== undefined && item.exit_code !== 0;
             const out = (item.aggregated_output || "").trim();
             const short = out.length > 500 ? out.slice(0, 500) + "…" : out;
             if (!session.events.some(e => e.type === "tool_start" && e.id === item.id)) {
-              console.log(`\n${C.magenta}🔧 ${cmd}${C.reset}`);
-              pushEvent(session, { type: "tool_start", name: cmd, id: item.id });
+              console.log(`\n${C.magenta}🔧 ${p.base}${C.reset}`);
+              pushEvent(session, { type: "tool_start", name: p.label, id: item.id });
+              pushEvent(session, { type: "tool_detail", text: p.short });
             }
-            if (short) pushEvent(session, { type: "tool_detail", text: short });
             console.log(`${isErr ? C.red : C.green}   ${isErr ? "✗" : "✓"} exit=${item.exit_code ?? 0}${C.reset}`);
-            pushEvent(session, { type: "tool_result", name: cmd, is_error: isErr, content: short });
+            pushEvent(session, { type: "tool_result", name: p.label, is_error: isErr, content: short });
           }
         }
 

@@ -12,7 +12,7 @@
   const MOD_KEY = isMac ? "⌥" : "Alt";
   const LOG = (...args) => console.log("[CC]", ...args);
   const BRIDGE = "http://localhost:5174";
-  const ENGINE_META = { claude: { label: "Claude", color: "#D97757" }, codex: { label: "Codex", color: "#10a37f" } };
+  const ENGINE_META = { claude: { label: "Claude", color: "#D97757", title: "Claude Code" }, codex: { label: "Codex", color: "#10a37f", title: "Codex" } };
 
   function getDocUrl() { return window.__CC_DOC_URL__ || location.href; }
   function getDocTitle() { return window.__CC_DOC_TITLE__ || document.title; }
@@ -97,6 +97,7 @@
         <button class="cc-send-btn" title="发送 (Enter)">${ICON.send}</button>
       </div>
       <div class="cc-input-footer">
+        <button class="cc-engine-switch"></button>
         <span class="cc-input-hint"><kbd>↵</kbd> 发送 · <kbd>Shift</kbd>+<kbd>↵</kbd> 换行</span>
       </div>
     </div>
@@ -111,6 +112,27 @@
   const linkedDocsEl = panel.querySelector(".cc-linked-docs");
   let linkedDocs = []; // [{ url, title }]
   const sessionListEl = panel.querySelector(".cc-session-list");
+  const engineSwitchBtn = panel.querySelector(".cc-engine-switch");
+  const headerTitleEl = panel.querySelector(".cc-title");
+  let currentEngine = "claude";
+  const ENGINE_IDS = Object.keys(ENGINE_META);
+
+  function renderEngineSwitch() {
+    const m = ENGINE_META[currentEngine] || { label: currentEngine, color: "#888", title: currentEngine };
+    engineSwitchBtn.innerHTML = `<span class="cc-engine-dot" style="background:${m.color}"></span>${m.label} <span class="cc-engine-arrow">▾</span>`;
+    headerTitleEl.innerHTML = `${ICON.claude} ${m.title}`;
+    const conv = activeConv();
+    const welcome = conv?.container.querySelector(".cc-welcome-title");
+    if (welcome) welcome.textContent = m.title;
+  }
+  engineSwitchBtn.addEventListener("click", () => {
+    const idx = ENGINE_IDS.indexOf(currentEngine);
+    currentEngine = ENGINE_IDS[(idx + 1) % ENGINE_IDS.length];
+    const conv = activeConv();
+    if (conv && !conv.engineSessionId) conv.engine = currentEngine;
+    renderEngineSwitch();
+  });
+  renderEngineSwitch();
 
   // ========== CONVERSATION MANAGEMENT (DOM-based, no innerHTML swap) ==========
   function createConvContainer() {
@@ -123,7 +145,7 @@
   function makeConv(title) {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const container = createConvContainer();
-    return { id, engine: "claude", engineSessionId: null, engineCwd: null, isImported: false, originSessionId: null, title: title || "新会话", container, createdAt: Date.now() };
+    return { id, engine: currentEngine, engineSessionId: null, engineCwd: null, isImported: false, originSessionId: null, title: title || "新会话", container, createdAt: Date.now() };
   }
 
   function showConv(id) {
@@ -134,6 +156,8 @@
     if (!conv.container.parentElement) msgsWrap.appendChild(conv.container);
     conv.container.style.display = "flex";
     activeConvId = id;
+    currentEngine = conv.engine || "claude";
+    renderEngineSwitch();
     hideSessionList();
   }
 
@@ -483,7 +507,7 @@
   async function checkHealth() { try { const r = await fetch(BRIDGE + "/health", { signal: AbortSignal.timeout(3000) }); bridgeOnline = !!(await r.json()).ok; } catch (_) { bridgeOnline = false; } statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline"); }
 
   // ========== HELPERS ==========
-  function getWelcomeHTML() { return `<div class="cc-welcome"><div class="cc-welcome-title">Claude Code</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-shortcuts"><span><kbd>${MOD_KEY}</kbd>+<kbd>J</kbd> 打开</span><span><kbd>↵</kbd> 发送</span></div></div>`; }
+  function getWelcomeHTML() { const t = (ENGINE_META[currentEngine] || {}).title || "Claude Code"; return `<div class="cc-welcome"><div class="cc-welcome-title">${t}</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-shortcuts"><span><kbd>${MOD_KEY}</kbd>+<kbd>J</kbd> 打开</span><span><kbd>↵</kbd> 发送</span></div></div>`; }
 
   function addUserMsg(container, text) {
     const w = container.querySelector(".cc-welcome"); if (w) w.remove();
@@ -534,9 +558,9 @@
   function humanizeError(err) {
     if (!err) return "发生未知错误，请重试";
     if (err.includes("超时")) return "请求处理时间过长，已自动停止，请尝试简化请求后重试";
-    if (/退出码\s*\d+/.test(err)) return "Claude 处理异常，请重试";
+    if (/退出码\s*\d+/.test(err)) return "处理异常，请重试";
     if (err.includes("SIGTERM") || err.includes("SIGKILL")) return "请求已被终止";
-    if (err.includes("无法启动")) return "无法启动 Claude，请确认 Bridge 正在运行";
+    if (err.includes("无法启动")) return err;
     return err;
   }
 
