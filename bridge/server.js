@@ -111,7 +111,7 @@ setInterval(() => {
 }, 60_000);
 
 // ========== Prompt builder ==========
-function buildPrompt({ request, url, title, selection, linkedDocs, cursorPos }) {
+function buildPrompt({ request, url, title, selection, linkedDocs, cursorPos }, engine) {
   const ctxLines = [];
   if (title) ctxLines.push(`- 当前文档（主文档）：${title}`);
   if (url) ctxLines.push(`  链接：${url}`);
@@ -142,6 +142,7 @@ function buildPrompt({ request, url, title, selection, linkedDocs, cursorPos }) 
     "4. 如果用户请求里有'调研''查一下''搜索'等意图，先用 WebSearch 工具收集信息，再写入文档。",
     "5. 简洁地总结你做了什么、写到了哪里。",
     "6. 所有思考过程和最终回复必须使用中文。",
+    ...(engine?.promptExtra ? ["", engine.promptExtra] : []),
   ].join("\n");
 }
 
@@ -438,6 +439,11 @@ const ENGINES = {
 
   codex: {
     id: "codex", label: "Codex", color: "#10a37f",
+    promptExtra: [
+      "重要：WPS-AirPage-Skill CLI 的绝对路径是 ~/.codex/skills/wps-airpage/scripts/cli.js",
+      "所有 CLI 调用必须使用绝对路径，例如：node ~/.codex/skills/wps-airpage/scripts/cli.js resolve <url>",
+      "不要尝试从当前工作目录查找 scripts/cli.js。",
+    ].join("\n"),
 
     async listSessions(excludeSet) {
       const os = await import("os");
@@ -634,7 +640,7 @@ app.post("/start", (req, res) => {
   if (!engine) return res.status(400).json({ ok: false, error: `未知引擎: ${engineId}` });
 
   const session = createSession();
-  const prompt = buildPrompt(req.body);
+  const prompt = buildPrompt(req.body, engine);
   const isResume = !!engineSessionId;
 
   console.log(`\n${C.cyan}${C.bold}━━━ [${session.id}] ${engine.label} ${isResume ? "Resume" : "New"} ━━━${C.reset}`);
