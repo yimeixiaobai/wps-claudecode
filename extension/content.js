@@ -12,7 +12,7 @@
   const MOD_KEY = isMac ? "⌥" : "Alt";
   const LOG = (...args) => console.log("[CC]", ...args);
   const BRIDGE = "http://localhost:5174";
-
+  const ENGINE_META = { claude: { label: "Claude", color: "#D97757", title: "Claude Code" }, codex: { label: "Codex", color: "#10a37f", title: "Codex" } };
 
   function getDocUrl() { return window.__CC_DOC_URL__ || location.href; }
   function getDocTitle() { return window.__CC_DOC_TITLE__ || document.title; }
@@ -97,6 +97,7 @@
         <button class="cc-send-btn" title="发送 (Enter)">${ICON.send}</button>
       </div>
       <div class="cc-input-footer">
+        <button class="cc-engine-switch"></button>
         <span class="cc-input-hint"><kbd>↵</kbd> 发送 · <kbd>Shift</kbd>+<kbd>↵</kbd> 换行</span>
       </div>
     </div>
@@ -111,6 +112,27 @@
   const linkedDocsEl = panel.querySelector(".cc-linked-docs");
   let linkedDocs = []; // [{ url, title }]
   const sessionListEl = panel.querySelector(".cc-session-list");
+  const engineSwitchBtn = panel.querySelector(".cc-engine-switch");
+  const headerTitleEl = panel.querySelector(".cc-title");
+  let currentEngine = "claude";
+  const ENGINE_IDS = Object.keys(ENGINE_META);
+
+  function renderEngineSwitch() {
+    const m = ENGINE_META[currentEngine] || { label: currentEngine, color: "#888", title: currentEngine };
+    engineSwitchBtn.innerHTML = `<span class="cc-engine-dot" style="background:${m.color}"></span>${m.label} <span class="cc-engine-arrow">▾</span>`;
+    headerTitleEl.innerHTML = `${ICON.claude} ${m.title}`;
+    const conv = activeConv();
+    const welcome = conv?.container.querySelector(".cc-welcome-title");
+    if (welcome) welcome.textContent = m.title;
+  }
+  engineSwitchBtn.addEventListener("click", () => {
+    const idx = ENGINE_IDS.indexOf(currentEngine);
+    currentEngine = ENGINE_IDS[(idx + 1) % ENGINE_IDS.length];
+    const conv = activeConv();
+    if (conv && !conv.engineSessionId) conv.engine = currentEngine;
+    renderEngineSwitch();
+  });
+  renderEngineSwitch();
 
   // ========== CONVERSATION MANAGEMENT (DOM-based, no innerHTML swap) ==========
   function createConvContainer() {
@@ -123,7 +145,7 @@
   function makeConv(title) {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const container = createConvContainer();
-    return { id, claudeSessionId: null, claudeCwd: null, isImported: false, originSessionId: null, title: title || "新会话", container, createdAt: Date.now() };
+    return { id, engine: currentEngine, engineSessionId: null, engineCwd: null, isImported: false, originSessionId: null, title: title || "新会话", container, createdAt: Date.now() };
   }
 
   function showConv(id) {
@@ -134,6 +156,8 @@
     if (!conv.container.parentElement) msgsWrap.appendChild(conv.container);
     conv.container.style.display = "flex";
     activeConvId = id;
+    currentEngine = conv.engine || "claude";
+    renderEngineSwitch();
     hideSessionList();
   }
 
@@ -172,7 +196,7 @@
   function persistIndex() {
     try {
       chrome.storage.local.set({ [STORAGE_KEY]: convs.map(c => ({
-        id: c.id, claudeSessionId: c.claudeSessionId, claudeCwd: c.claudeCwd, isImported: c.isImported, originSessionId: c.originSessionId, title: c.title, createdAt: c.createdAt,
+        id: c.id, engine: c.engine || "claude", engineSessionId: c.engineSessionId, engineCwd: c.engineCwd, isImported: c.isImported, originSessionId: c.originSessionId, title: c.title, createdAt: c.createdAt,
         html: c.container.innerHTML,
       }))});
     } catch (_) {}
@@ -207,7 +231,7 @@
         rebindContainerEvents(container);
         container.style.display = "none";
         msgsWrap.appendChild(container);
-        convs.push({ id: s.id, claudeSessionId: s.claudeSessionId, claudeCwd: s.claudeCwd || null, isImported: !!s.isImported, originSessionId: s.originSessionId || null, title: s.title, container, createdAt: s.createdAt });
+        convs.push({ id: s.id, engine: s.engine || "claude", engineSessionId: s.engineSessionId || s.claudeSessionId || s.codexSessionId || null, engineCwd: s.engineCwd || s.claudeCwd || s.codexCwd || null, isImported: !!s.isImported, originSessionId: s.originSessionId || null, title: s.title, container, createdAt: s.createdAt });
       });
     } catch (_) {}
     if (convs.length > 0) showConv(convs[0].id);
@@ -220,10 +244,9 @@
   function renderSessionList() {
     sessionListEl.innerHTML = "";
 
-    // Tab bar: 插件会话 / 导入本地
     const tabs = document.createElement("div");
     tabs.className = "cc-sl-tabs";
-    tabs.innerHTML = `<span class="cc-sl-tab ${showingImport ? "" : "cc-sl-tab-active"}" data-tab="local">插件会话</span><span class="cc-sl-tab ${showingImport ? "cc-sl-tab-active" : ""}" data-tab="import">导入本地 Claude</span>`;
+    tabs.innerHTML = `<span class="cc-sl-tab ${showingImport ? "" : "cc-sl-tab-active"}" data-tab="local">插件会话</span><span class="cc-sl-tab ${showingImport ? "cc-sl-tab-active" : ""}" data-tab="import">导入本地</span>`;
     tabs.querySelector('[data-tab="local"]').addEventListener("click", () => { showingImport = false; renderSessionList(); });
     tabs.querySelector('[data-tab="import"]').addEventListener("click", () => { showingImport = true; renderSessionList(); loadLocalSessions(); });
     sessionListEl.appendChild(tabs);
@@ -237,13 +260,14 @@
       return;
     }
 
-    // Plugin conversations
     if (convs.length === 0) { listWrap.innerHTML = `<div class="cc-sl-empty">暂无会话</div>`; return; }
     convs.forEach(c => {
       const item = document.createElement("div");
       item.className = "cc-sl-item" + (c.id === activeConvId ? " cc-sl-active" : "");
       const t = new Date(c.createdAt);
-      item.innerHTML = `<div class="cc-sl-info"><div class="cc-sl-title">${esc(c.title)}</div><div class="cc-sl-time">${t.getMonth()+1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2,"0")}</div></div><button class="cc-sl-del" title="删除">×</button>`;
+      const em = ENGINE_META[c.engine];
+      const badge = c.engine !== "claude" && em ? `<span class="cc-engine-badge" style="background:${em.color}">${em.label}</span> ` : "";
+      item.innerHTML = `<div class="cc-sl-info">${badge}<div class="cc-sl-title">${esc(c.title)}</div><div class="cc-sl-time">${t.getMonth()+1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2,"0")}</div></div><button class="cc-sl-del" title="删除">×</button>`;
       item.querySelector(".cc-sl-info").addEventListener("click", () => switchToConv(c.id));
       item.querySelector(".cc-sl-del").addEventListener("click", (e) => { e.stopPropagation(); deleteConv(c.id); });
       listWrap.appendChild(item);
@@ -254,26 +278,26 @@
     const listWrap = sessionListEl.querySelector(".cc-sl-list-wrap");
     if (!listWrap) return;
     try {
-      const excludeIds = [...new Set(convs.flatMap(c => [c.claudeSessionId, c.originSessionId]).filter(Boolean))];
+      const excludeIds = [...new Set(convs.flatMap(c => [c.engineSessionId, c.originSessionId]).filter(Boolean))];
       const r = await fetch(BRIDGE + "/local-sessions?exclude=" + encodeURIComponent(excludeIds.join(",")));
       const d = await r.json();
-      if (!d.ok || !d.sessions?.length) { listWrap.innerHTML = `<div class="cc-sl-empty">未找到本地 Claude 会话</div>`; return; }
+      if (!d.ok || !d.sessions?.length) { listWrap.innerHTML = `<div class="cc-sl-empty">未找到本地会话</div>`; return; }
       listWrap.innerHTML = "";
       d.sessions.forEach(s => {
         const item = document.createElement("div");
         item.className = "cc-sl-item cc-sl-import";
-        const t = new Date(s.updatedAt);
         item.innerHTML = `
           <div class="cc-sl-info">
+            <span class="cc-engine-badge" style="background:${esc(s.engineColor || "#D97757")}">${esc(s.engineLabel || s.engine)}</span>
             <div class="cc-sl-title">${esc(s.title)}</div>
             <div class="cc-sl-meta">${s.turns}轮 · ${esc(s.project)}</div>
             ${s.summary ? `<div class="cc-sl-summary">${esc(s.summary)}</div>` : ""}
           </div>
-          <button class="cc-sl-import-btn">导入</button>
+          <button class="cc-sl-import-btn" style="background:${esc(s.engineColor || "#D97757")}">导入</button>
         `;
         item.querySelector(".cc-sl-import-btn").addEventListener("click", (e) => {
           e.stopPropagation();
-          importLocalSession(s);
+          importSession(s);
         });
         listWrap.appendChild(item);
       });
@@ -282,29 +306,30 @@
     }
   }
 
-  function importLocalSession(s) {
-    // Create a new conversation linked to the local Claude session
+  function importSession(s) {
     const conv = makeConv(s.title);
-    conv.claudeSessionId = s.sessionId;
-    conv.claudeCwd = s.cwd || null;
+    conv.engine = s.engine || "claude";
+    conv.engineSessionId = s.sessionId;
+    conv.engineCwd = s.cwd || null;
     conv.isImported = true;
     conv.originSessionId = s.sessionId;
     convs.unshift(conv);
     if (convs.length > MAX_SESSIONS) { const old = convs.pop(); old.container.remove(); }
     msgsWrap.appendChild(conv.container);
 
-    // Show a welcome-like message indicating this is imported
     const w = conv.container.querySelector(".cc-welcome");
     if (w) w.remove();
     const notice = document.createElement("div");
     notice.className = "cc-import-notice";
-    notice.innerHTML = `<strong>已导入本地会话</strong><br/>${esc(s.title)}<br/><span class="cc-text-muted">${s.turns}轮对话 · ${esc(s.project)}</span>`;
+    const color = s.engineColor || "#D97757";
+    notice.style.background = color + "14";
+    notice.innerHTML = `<strong style="color:${esc(color)}">已导入 ${esc(s.engineLabel || s.engine)} 会话</strong><br/>${esc(s.title)}<br/><span class="cc-text-muted">${s.turns}轮对话 · ${esc(s.project)}</span>`;
     conv.container.appendChild(notice);
 
     showConv(conv.id);
     persistIndex();
     showingImport = false;
-    LOG("imported local session:", s.sessionId);
+    LOG("imported session:", s.engine, s.sessionId);
   }
 
   function toggleSessionList() { const v = sessionListEl.classList.contains("cc-sl-visible"); if (v) hideSessionList(); else { showingImport = false; renderSessionList(); sessionListEl.classList.add("cc-sl-visible"); } }
@@ -482,7 +507,7 @@
   async function checkHealth() { try { const r = await fetch(BRIDGE + "/health", { signal: AbortSignal.timeout(3000) }); bridgeOnline = !!(await r.json()).ok; } catch (_) { bridgeOnline = false; } statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline"); }
 
   // ========== HELPERS ==========
-  function getWelcomeHTML() { return `<div class="cc-welcome"><div class="cc-welcome-title">Claude Code</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-shortcuts"><span><kbd>${MOD_KEY}</kbd>+<kbd>J</kbd> 打开</span><span><kbd>↵</kbd> 发送</span></div></div>`; }
+  function getWelcomeHTML() { const t = (ENGINE_META[currentEngine] || {}).title || "Claude Code"; return `<div class="cc-welcome"><div class="cc-welcome-title">${t}</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-shortcuts"><span><kbd>${MOD_KEY}</kbd>+<kbd>J</kbd> 打开</span><span><kbd>↵</kbd> 发送</span></div></div>`; }
 
   function addUserMsg(container, text) {
     const w = container.querySelector(".cc-welcome"); if (w) w.remove();
@@ -533,9 +558,9 @@
   function humanizeError(err) {
     if (!err) return "发生未知错误，请重试";
     if (err.includes("超时")) return "请求处理时间过长，已自动停止，请尝试简化请求后重试";
-    if (/退出码\s*\d+/.test(err)) return "Claude 处理异常，请重试";
+    if (/退出码\s*\d+/.test(err)) return "处理异常，请重试";
     if (err.includes("SIGTERM") || err.includes("SIGKILL")) return "请求已被终止";
-    if (err.includes("无法启动")) return "无法启动 Claude，请确认 Bridge 正在运行";
+    if (err.includes("无法启动")) return err;
     return err;
   }
 
@@ -570,9 +595,7 @@
 
     const targetConvId = conv.id;
     const container = conv.container;
-    const targetClaudeSession = conv.claudeSessionId;
-    const targetCwd = conv.claudeCwd;
-    const needsFork = conv.isImported && !!targetClaudeSession;
+    const needsFork = conv.isImported && conv.engine === "claude" && !!conv.engineSessionId;
 
     inputHistory.unshift(text); if (inputHistory.length > 20) inputHistory.pop(); historyIdx = -1;
 
@@ -613,7 +636,7 @@
 
     function handleEvent(ev) {
       switch (ev.type) {
-        case "claude_session": { const c = getConv(targetConvId); if (c) { c.claudeSessionId = ev.claudeSessionId; c.isImported = false; } LOG("claude session:", ev.claudeSessionId); break; }
+        case "engine_session": { const c = getConv(targetConvId); if (c) { c.engineSessionId = ev.engineSessionId; c.isImported = false; } LOG("engine session:", ev.engineSessionId); break; }
         case "status": updateStatus(activityEl, ev.message); break;
         case "thinking_start": clearSteps(activityEl, "status"); if (!activityEl.querySelector('.cc-step[data-type="thinking"]')) addStep(activityEl, "thinking", "思考中…"); break;
         case "thinking": break;
@@ -659,7 +682,7 @@
     try {
       const startRes = await fetch(BRIDGE + "/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request: text, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, claudeSessionId: targetClaudeSession, claudeCwd: targetCwd, forkSession: needsFork, cursorPos: { from: cachedCursorFrom, to: cachedCursorTo, context: cachedCursorCtx } }),
+        body: JSON.stringify({ request: text, engine: conv.engine || "claude", engineSessionId: conv.engineSessionId, engineCwd: conv.engineCwd, forkSession: needsFork, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, cursorPos: { from: cachedCursorFrom, to: cachedCursorTo, context: cachedCursorCtx } }),
       });
       const d = await startRes.json(); if (!d.ok) throw new Error(d.error || "启动失败");
       sessionId = d.sessionId; LOG("session:", sessionId);

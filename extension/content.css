@@ -410,6 +410,16 @@
   transition: opacity 0.12s;
 }
 .cc-sl-import-btn:hover { opacity: 0.85; }
+.cc-engine-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-bottom: 2px;
+  letter-spacing: 0.3px;
+}
 
 /* Import notice */
 .cc-import-notice {
@@ -739,6 +749,23 @@
   accent-color: var(--cc-ember);
   margin: 0;
 }
+.cc-engine-switch {
+  background: none;
+  border: 1px solid var(--cc-surface-4);
+  border-radius: 4px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-family: var(--cc-font);
+  color: var(--cc-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.cc-engine-switch:hover { border-color: var(--cc-text-muted); background: var(--cc-surface-2); }
+.cc-engine-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.cc-engine-arrow { font-size: 8px; color: var(--cc-text-ghost); }
 .cc-input-hint {
   font-size: 10px;
   color: var(--cc-text-ghost);

@@ -2,14 +2,15 @@
 // Claude Code for WPS协作 (WOA) — Webview 中继模式
 //
 // 安装方法:
-//   1. 在 WOA 中按 F12 打开 DevTools
-//   2. 切到 Sources（源代码）→ Snippets（代码段）
-//   3. 点 + New snippet，命名为 "Claude Code"
-//   4. 粘贴此文件全部内容，Ctrl+S 保存
-//   5. 右键 snippet → Run（或 Ctrl+Enter）即可启动
+//   1. 请先打开协作的调试模式
+//   2. 点击打开 Console 控制台
+//   3. 切到 Sources（源代码）→ 左侧 Snippets（代码段）
+//   4. 点 + New snippet，命名为 "Claude Code"
+//   5. 粘贴此文件全部内容，Ctrl+S 保存
+//   6. 右键该 snippet → Run（或 Ctrl+Enter）
 //
 // 使用：运行后右下角出现橘色按钮，点击打开面板。
-//       再次运行 snippet 可关闭。
+//       再次运行 snippet 可关闭面板。
 //       需要先启动 Bridge（双击 install.command 或手动 cd bridge && npm start）
 // ═══════════════════════════════════════════════════════════════
 

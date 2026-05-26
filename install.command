@@ -69,13 +69,12 @@ if [ -z "$CLAUDE_VER" ]; then
 fi
 echo "  ✓ Claude CLI $CLAUDE_VER"
 
-# ─── Step 2: 安装 WPS-AirPage-Skill ───
+# ─── Step 2: 安装 WPS-AirPage-Skill（自动检测所有 vibe coding 工具） ───
 
 echo ""
 echo "▶ 安装 WPS-AirPage-Skill…"
 
 SKILL_SRC="$REPO_DIR/skills/WPS-AirPage-Skill"
-SKILL_DST="$HOME/.claude/skills/WPS-AirPage-Skill"
 
 if [ ! -d "$SKILL_SRC" ]; then
   echo "  ❌ 未找到 skills/WPS-AirPage-Skill 目录"
@@ -83,28 +82,59 @@ if [ ! -d "$SKILL_SRC" ]; then
   exit 1
 fi
 
+# 主安装目录（Claude Code，用 rsync 完整复制）
+SKILL_PRIMARY="$HOME/.claude/skills/WPS-AirPage-Skill"
 mkdir -p "$HOME/.claude/skills"
 
-if [ -d "$SKILL_DST" ]; then
-  echo "  ↻ 已存在，更新中…"
-  # 保留用户的 node_modules 和本地配置，同步其余文件
+if [ -d "$SKILL_PRIMARY" ]; then
+  echo "  ↻ Claude Code: 已存在，更新中…"
   rsync -a --delete \
     --exclude='node_modules' \
     --exclude='.DS_Store' \
-    "$SKILL_SRC/" "$SKILL_DST/"
+    "$SKILL_SRC/" "$SKILL_PRIMARY/"
 else
-  echo "  + 首次安装…"
-  cp -R "$SKILL_SRC" "$SKILL_DST"
+  echo "  + Claude Code: 首次安装…"
+  cp -R "$SKILL_SRC" "$SKILL_PRIMARY"
 fi
 
 # 安装 Skill 依赖
-if [ -f "$SKILL_DST/package.json" ]; then
-  if [ ! -d "$SKILL_DST/node_modules" ] || [ "$SKILL_DST/package.json" -nt "$SKILL_DST/node_modules/.package-lock.json" ]; then
+if [ -f "$SKILL_PRIMARY/package.json" ]; then
+  if [ ! -d "$SKILL_PRIMARY/node_modules" ] || [ "$SKILL_PRIMARY/package.json" -nt "$SKILL_PRIMARY/node_modules/.package-lock.json" ]; then
     echo "  📦 安装 Skill 依赖…"
-    (cd "$SKILL_DST" && npm install --production --silent 2>/dev/null)
+    (cd "$SKILL_PRIMARY" && npm install --production --silent 2>/dev/null)
   fi
 fi
-echo "  ✓ WPS-AirPage-Skill 已就绪"
+echo "  ✓ Claude Code → ~/.claude/skills/WPS-AirPage-Skill"
+
+# 自动检测其他 vibe coding 工具，用软链接共享同一份 Skill
+# 格式：命令名 | 显示名 | 技能目录 | 技能子目录名
+TOOLS="
+codex|Codex|$HOME/.codex/skills|wps-airpage
+"
+
+echo "$TOOLS" | while IFS='|' read -r cmd label skills_dir skill_name; do
+  [ -z "$cmd" ] && continue
+  cmd=$(echo "$cmd" | xargs)
+  label=$(echo "$label" | xargs)
+  skills_dir=$(echo "$skills_dir" | xargs)
+  skill_name=$(echo "$skill_name" | xargs)
+
+  if command -v "$cmd" >/dev/null 2>&1; then
+    SKILL_LINK="$skills_dir/$skill_name"
+    mkdir -p "$skills_dir"
+    if [ -L "$SKILL_LINK" ]; then
+      echo "  ✓ $label → $SKILL_LINK (已链接)"
+    elif [ -d "$SKILL_LINK" ]; then
+      echo "  ↻ $label: 已存在目录，替换为软链接…"
+      rm -rf "$SKILL_LINK"
+      ln -s "$SKILL_PRIMARY" "$SKILL_LINK"
+      echo "  ✓ $label → $SKILL_LINK"
+    else
+      ln -s "$SKILL_PRIMARY" "$SKILL_LINK"
+      echo "  ✓ $label → $SKILL_LINK (新建链接)"
+    fi
+  fi
+done
 
 # ─── Step 3: 安装 Bridge 依赖 ───
 
@@ -323,6 +353,7 @@ echo ""
 echo "  📌 摘要:"
 echo "     Bridge:    后台运行中（开机自启）"
 echo "     Skill:     ~/.claude/skills/WPS-AirPage-Skill/"
+command -v codex >/dev/null 2>&1 && echo "                ~/.codex/skills/wps-airpage/ (链接)"
 echo "     扩展路径:  $EXT_DIR"
 echo "     日志:      $LOG_DIR/bridge.log"
 echo ""
