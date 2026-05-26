@@ -14,7 +14,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["inject-sel.js", "inject-bridge.js"],
+      "resources": ["inject-bridge.js"],
       "matches": ["https://365.kdocs.cn/*", "https://www.kdocs.cn/*"]
     }
   ],
