@@ -33,7 +33,7 @@ app.use((req, res, next) => {
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "20mb" }));
 
 // ========== Request logger ==========
 const QUIET_PATHS = new Set(["/health"]);
@@ -81,6 +81,11 @@ function cleanupSession(id) {
   const session = sessions.get(id);
   if (!session) return;
   if (session.timeoutId) clearTimeout(session.timeoutId);
+  if (session.imagePaths) {
+    import("fs").then(fs => {
+      for (const p of session.imagePaths) fs.unlink(p, () => {});
+    });
+  }
   session.events = [];
   session.proc = null;
   sessions.delete(id);
@@ -111,7 +116,7 @@ setInterval(() => {
 }, 60_000);
 
 // ========== Prompt builder ==========
-function buildPrompt({ request, url, title, selection, linkedDocs, cursorPos }, engine) {
+function buildPrompt({ request, url, title, selection, linkedDocs, cursorPos, imagePaths }, engine) {
   const ctxLines = [];
   if (title) ctxLines.push(`- 当前文档（主文档）：${title}`);
   if (url) ctxLines.push(`  链接：${url}`);
@@ -131,12 +136,28 @@ function buildPrompt({ request, url, title, selection, linkedDocs, cursorPos }, 
       ctxLines.push(`  ${i + 1}. ${doc.title || "文档"} — ${doc.url}`);
     });
   }
+  const hasImages = Array.isArray(imagePaths) && imagePaths.length > 0;
+  if (hasImages) {
+    ctxLines.push(`- 用户附带了 ${imagePaths.length} 张图片：`);
+    imagePaths.forEach((p, i) => { ctxLines.push(`  ${i + 1}. ${p}`); });
+  }
+
+  const imageFirstSteps = hasImages ? [
+    "",
+    "⚠ 首要步骤（必须最先执行）：用户附带了图片，先用 Read 工具读取图片：",
+    ...imagePaths.map(p => `   → 调用 Read 工具，file_path 设为 "${p}"`),
+    "读取图片后根据用户请求回答。如果请求仅涉及图片内容（不需要写入文档），直接回答即可，无需使用 WPS-AirPage-Skill。",
+    "",
+  ] : [];
+
   return [
-    "我正在 WPS 365 智能文档（AirPage / kdocs）中工作，请使用 WPS-AirPage-Skill 完成下面的请求。",
+    "我正在 WPS 365 智能文档（AirPage / kdocs）中工作。",
     "", "上下文：", ctxLines.join("\n") || "（无上下文）", "",
-    `用户请求：${request}`, "",
+    `用户请求：${request}`,
+    ...imageFirstSteps,
+    "",
     "执行要求：",
-    "1. 先从文档链接解析 file_id（短链由 CLI 自动解析）。",
+    "1. 如果需要操作文档，使用 WPS-AirPage-Skill，先从文档链接解析 file_id（短链由 CLI 自动解析）。",
     "2. 如果是写操作，默认写入当前主文档；如需操作关联文档请先确认。",
     "3. 可以从关联文档中 query 读取内容，作为参考素材写入主文档。",
     "4. 如果用户请求里有'调研''查一下''搜索'等意图，先用 WebSearch 工具收集信息，再写入文档。",
@@ -550,6 +571,7 @@ const ENGINES = {
       }
 
       return function (obj) {
+        console.log(`${C.dim}[codex-event] ${obj.type}${C.reset}`);
         if (obj.type === "thread.started") {
           const sid = obj.thread_id || "";
           console.log(`${C.blue}⚙ codex thread=${sid}${C.reset}`);
@@ -571,6 +593,13 @@ const ENGINES = {
             pushEvent(session, { type: "tool_start", name: p.label, id: item.id });
             pushEvent(session, { type: "tool_detail", text: p.short });
           }
+        }
+
+        // Native streaming delta (future Codex versions)
+        if (obj.type === "item/agentMessage/delta" && obj.delta) {
+          endThinking();
+          process.stdout.write(obj.delta);
+          pushEvent(session, { type: "delta", text: obj.delta });
         }
 
         if (obj.type === "item.completed") {
@@ -631,8 +660,8 @@ app.get("/local-sessions", async (req, res) => {
 });
 
 // Unified start — dispatches to the right engine adapter
-app.post("/start", (req, res) => {
-  const { request, engine: reqEngine, engineSessionId, engineCwd, forkSession } = req.body || {};
+app.post("/start", async (req, res) => {
+  const { request, engine: reqEngine, engineSessionId, engineCwd, forkSession, images } = req.body || {};
   if (!request) return res.status(400).json({ ok: false, error: "缺少 request 字段" });
 
   const engineId = reqEngine || "claude";
@@ -640,7 +669,29 @@ app.post("/start", (req, res) => {
   if (!engine) return res.status(400).json({ ok: false, error: `未知引擎: ${engineId}` });
 
   const session = createSession();
-  const prompt = buildPrompt(req.body, engine);
+
+  let imagePaths = [];
+  if (Array.isArray(images) && images.length > 0) {
+    try {
+      const fs = await import("fs");
+      const path = await import("path");
+      const os = await import("os");
+      for (const img of images) {
+        const ext = (img.type || "image/png").split("/")[1] || "png";
+        const tmpPath = path.join(os.tmpdir(), `cc-img-${randomUUID().slice(0,8)}.${ext}`);
+        const buf = Buffer.from(img.data, "base64");
+        await fs.promises.writeFile(tmpPath, buf);
+        imagePaths.push(tmpPath);
+        console.log(`${C.dim}   📷 saved image: ${tmpPath} (${(buf.length / 1024).toFixed(1)}KB)${C.reset}`);
+      }
+      session.imagePaths = imagePaths;
+    } catch (imgErr) {
+      console.error(`${C.red}   image save failed: ${imgErr.message}${C.reset}`);
+      return res.json({ ok: false, error: `图片保存失败: ${imgErr.message}` });
+    }
+  }
+
+  const prompt = buildPrompt({ ...req.body, imagePaths }, engine);
   const isResume = !!engineSessionId;
 
   console.log(`\n${C.cyan}${C.bold}━━━ [${session.id}] ${engine.label} ${isResume ? "Resume" : "New"} ━━━${C.reset}`);

@@ -61,6 +61,7 @@
     copy: `<svg viewBox="0 0 24 24" width="12" height="12"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" fill="none" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
     docWrite: `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" fill="none" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
     quote: `<svg viewBox="0 0 16 16" width="13" height="13"><path d="M4 2v3a6 6 0 006 6h2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 9l2 2-2 2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    image: `<svg viewBox="0 0 24 24" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" fill="none" stroke-width="2"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" fill="none" stroke-width="1.5"/><path d="M21 15l-5-5L5 21" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   };
 
   // ========== FAB ==========
@@ -92,7 +93,9 @@
       <div class="cc-quick-actions"></div>
       <div class="cc-linked-docs"></div>
       <div class="cc-selection-bar"></div>
+      <div class="cc-image-previews"></div>
       <div class="cc-input-wrapper">
+        <button class="cc-img-btn" title="添加图片 (可粘贴/拖放)">${ICON.image}</button>
         <textarea class="cc-input" rows="1" placeholder="输入你的请求…"></textarea>
         <button class="cc-send-btn" title="发送 (Enter)">${ICON.send}</button>
       </div>
@@ -111,6 +114,7 @@
   const selectionBar = panel.querySelector(".cc-selection-bar");
   const linkedDocsEl = panel.querySelector(".cc-linked-docs");
   let linkedDocs = []; // [{ url, title }]
+  let pendingImages = []; // [{ data: base64, name: string, type: string }]
   const sessionListEl = panel.querySelector(".cc-session-list");
   const engineSwitchBtn = panel.querySelector(".cc-engine-switch");
   const headerTitleEl = panel.querySelector(".cc-title");
@@ -127,10 +131,32 @@
   }
   engineSwitchBtn.addEventListener("click", () => {
     const idx = ENGINE_IDS.indexOf(currentEngine);
-    currentEngine = ENGINE_IDS[(idx + 1) % ENGINE_IDS.length];
+    const newEngine = ENGINE_IDS[(idx + 1) % ENGINE_IDS.length];
     const conv = activeConv();
-    if (conv && !conv.engineSessionId) conv.engine = currentEngine;
-    renderEngineSwitch();
+    if (conv && !conv.engineSessionId && !isStreaming) {
+      currentEngine = newEngine;
+      conv.engine = currentEngine;
+      renderEngineSwitch();
+    } else {
+      const prevConvId = activeConvId;
+      currentEngine = newEngine;
+      const created = newConversation();
+      const notice = document.createElement("div");
+      notice.className = "cc-switch-notice";
+      notice.style.borderColor = (ENGINE_META[newEngine]?.color || "#888") + "40";
+      const newMeta = ENGINE_META[newEngine];
+      notice.innerHTML = `已切换至 <strong style="color:${esc(newMeta.color)}">${esc(newMeta.label)}</strong> · <button class="cc-switch-back">返回上个对话</button>`;
+      notice.querySelector(".cc-switch-back").addEventListener("click", () => {
+        const newId = created.id;
+        if (prevConvId && getConv(prevConvId)) showConv(prevConvId);
+        created.container.remove();
+        convs = convs.filter(c => c.id !== newId);
+        persistIndex();
+      });
+      const welcome = created.container.querySelector(".cc-welcome");
+      if (welcome) created.container.insertBefore(notice, welcome);
+      else created.container.appendChild(notice);
+    }
   });
   renderEngineSwitch();
 
@@ -197,7 +223,7 @@
     try {
       chrome.storage.local.set({ [STORAGE_KEY]: convs.map(c => ({
         id: c.id, engine: c.engine || "claude", engineSessionId: c.engineSessionId, engineCwd: c.engineCwd, isImported: c.isImported, originSessionId: c.originSessionId, title: c.title, createdAt: c.createdAt,
-        html: c.container.innerHTML,
+        html: c.container.innerHTML.replace(/src="data:image\/[^"]+"/g, 'src="" data-stripped="1"'),
       }))});
     } catch (_) {}
   }
@@ -503,16 +529,88 @@
 
   renderLinkedDocs();
 
+  // ========== IMAGE ATTACHMENTS ==========
+  const imgBtn = panel.querySelector(".cc-img-btn");
+  const imgPreviewsEl = panel.querySelector(".cc-image-previews");
+  const MAX_IMAGES = 5;
+  const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+  function addImage(file) {
+    if (pendingImages.length >= MAX_IMAGES) return;
+    if (file.size > MAX_IMAGE_SIZE) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      pendingImages.push({
+        data: reader.result.split(",")[1],
+        name: file.name || "image." + (file.type.split("/")[1] || "png"),
+        type: file.type || "image/png",
+      });
+      renderImagePreviews();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function renderImagePreviews() {
+    imgPreviewsEl.innerHTML = "";
+    if (pendingImages.length === 0) { imgPreviewsEl.style.display = "none"; return; }
+    imgPreviewsEl.style.display = "flex";
+    pendingImages.forEach((img, i) => {
+      const thumb = document.createElement("div");
+      thumb.className = "cc-img-thumb";
+      thumb.innerHTML = `<img src="data:${img.type};base64,${img.data}" /><button class="cc-img-rm">×</button>`;
+      thumb.querySelector(".cc-img-rm").addEventListener("click", () => {
+        pendingImages.splice(i, 1);
+        renderImagePreviews();
+      });
+      imgPreviewsEl.appendChild(thumb);
+    });
+  }
+
+  imgBtn.addEventListener("click", () => {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "image/*"; inp.multiple = true;
+    inp.addEventListener("change", () => { for (const f of inp.files) addImage(f); });
+    inp.click();
+  });
+
+  inputEl.addEventListener("paste", (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) addImage(file);
+        return;
+      }
+    }
+  });
+
+  const inputWrapperEl = panel.querySelector(".cc-input-wrapper");
+  inputWrapperEl.addEventListener("dragover", (e) => { e.preventDefault(); inputWrapperEl.classList.add("cc-drag-over"); });
+  inputWrapperEl.addEventListener("dragleave", () => { inputWrapperEl.classList.remove("cc-drag-over"); });
+  inputWrapperEl.addEventListener("drop", (e) => {
+    e.preventDefault(); inputWrapperEl.classList.remove("cc-drag-over");
+    for (const file of e.dataTransfer.files) {
+      if (file.type.startsWith("image/")) addImage(file);
+    }
+  });
+
   // ========== HEALTH ==========
   async function checkHealth() { try { const r = await fetch(BRIDGE + "/health", { signal: AbortSignal.timeout(3000) }); bridgeOnline = !!(await r.json()).ok; } catch (_) { bridgeOnline = false; } statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline"); }
 
   // ========== HELPERS ==========
   function getWelcomeHTML() { const t = (ENGINE_META[currentEngine] || {}).title || "Claude Code"; return `<div class="cc-welcome"><div class="cc-welcome-title">${t}</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-shortcuts"><span><kbd>${MOD_KEY}</kbd>+<kbd>J</kbd> 打开</span><span><kbd>↵</kbd> 发送</span></div></div>`; }
 
-  function addUserMsg(container, text) {
+  function addUserMsg(container, text, images) {
     const w = container.querySelector(".cc-welcome"); if (w) w.remove();
+    const sn = container.querySelector(".cc-switch-notice"); if (sn) sn.remove();
     const m = document.createElement("div"); m.className = "cc-msg cc-msg-user";
-    m.innerHTML = `<div class="cc-msg-body">${esc(text)}</div>`;
+    let imgHtml = "";
+    if (images && images.length > 0) {
+      imgHtml = `<div class="cc-msg-images">${images.map(img => `<img class="cc-msg-img" src="data:${img.type};base64,${img.data}" />`).join("")}</div>`;
+    }
+    m.innerHTML = `<div class="cc-msg-body">${imgHtml}${esc(text)}</div>`;
     container.appendChild(m);
   }
 
@@ -585,22 +683,25 @@
   // ========== SEND ==========
   async function send() {
     if (isStreaming) return;
-    const text = inputEl.value.trim(); if (!text) return;
+    const text = inputEl.value.trim(); if (!text && pendingImages.length === 0) return;
     const selection = await waitForSelection();
 
     // Ensure conversation exists
     if (!activeConvId || !activeConv()) newConversation();
     const conv = activeConv();
-    if (conv.title === "新会话") { conv.title = text.length > 30 ? text.slice(0, 30) + "…" : text; }
+    if (conv.title === "新会话") { const t = text || "图片问答"; conv.title = t.length > 30 ? t.slice(0, 30) + "…" : t; }
 
     const targetConvId = conv.id;
     const container = conv.container;
     const needsFork = conv.isImported && conv.engine === "claude" && !!conv.engineSessionId;
 
-    inputHistory.unshift(text); if (inputHistory.length > 20) inputHistory.pop(); historyIdx = -1;
+    if (text) { inputHistory.unshift(text); if (inputHistory.length > 20) inputHistory.pop(); }
+    historyIdx = -1;
+    const sentImages = [...pendingImages];
+    pendingImages = []; renderImagePreviews();
 
     isStreaming = true; sendBtn.disabled = true; stopBtn.classList.add("cc-active"); fab.classList.add("cc-streaming");
-    addUserMsg(container, text);
+    addUserMsg(container, text || (sentImages.length > 0 ? "[图片]" : ""), sentImages);
     const { activityEl, replyEl, actionsEl } = addAssistantMsg(container);
     inputEl.value = ""; inputEl.style.height = "auto";
     scrollContainer(container);
@@ -682,7 +783,7 @@
     try {
       const startRes = await fetch(BRIDGE + "/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request: text, engine: conv.engine || "claude", engineSessionId: conv.engineSessionId, engineCwd: conv.engineCwd, forkSession: needsFork, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, cursorPos: { from: cachedCursorFrom, to: cachedCursorTo, context: cachedCursorCtx } }),
+        body: JSON.stringify({ request: text || "请分析图片内容", engine: conv.engine || "claude", engineSessionId: conv.engineSessionId, engineCwd: conv.engineCwd, forkSession: needsFork, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, cursorPos: { from: cachedCursorFrom, to: cachedCursorTo, context: cachedCursorCtx }, images: sentImages.length > 0 ? sentImages : undefined }),
       });
       const d = await startRes.json(); if (!d.ok) throw new Error(d.error || "启动失败");
       sessionId = d.sessionId; LOG("session:", sessionId);
