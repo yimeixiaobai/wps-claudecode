@@ -115,8 +115,25 @@ setInterval(() => {
   }
 }, 60_000);
 
+// ========== Directory helpers ==========
+// Expand ~ , resolve to absolute, and confirm it's an existing directory.
+// Returns the canonical absolute path, or null if it doesn't exist / isn't a dir.
+async function resolveDir(input) {
+  if (!input || typeof input !== "string") return null;
+  let p = input.trim();
+  if (!p) return null;
+  const os = await import("os");
+  const path = await import("path");
+  const fs = await import("fs");
+  if (p === "~") p = os.homedir();
+  else if (p.startsWith("~/")) p = path.join(os.homedir(), p.slice(2));
+  p = path.resolve(p);
+  const ok = await fs.promises.stat(p).then((st) => st.isDirectory()).catch(() => false);
+  return ok ? p : null;
+}
+
 // ========== Prompt builder ==========
-function buildPrompt({ request, url, title, selection, linkedDocs, cursorPos, imagePaths }, engine) {
+function buildPrompt({ request, url, title, selection, linkedDocs, cursorPos, imagePaths, linkedDir, refDirs }, engine) {
   const ctxLines = [];
   if (title) ctxLines.push(`- 当前文档（主文档）：${title}`);
   if (url) ctxLines.push(`  链接：${url}`);
@@ -136,6 +153,13 @@ function buildPrompt({ request, url, title, selection, linkedDocs, cursorPos, im
       ctxLines.push(`  ${i + 1}. ${doc.title || "文档"} — ${doc.url}`);
     });
   }
+  if (linkedDir) {
+    ctxLines.push(`- 工作目录（你正运行在此，可用相对路径、git、Glob/Grep）：${linkedDir}`);
+  }
+  if (Array.isArray(refDirs) && refDirs.length > 0) {
+    ctxLines.push(`- 参考目录（背景资料，用绝对路径读取，默认只读）：`);
+    refDirs.forEach((d, i) => { ctxLines.push(`  ${i + 1}. ${d}`); });
+  }
   const hasImages = Array.isArray(imagePaths) && imagePaths.length > 0;
   if (hasImages) {
     ctxLines.push(`- 用户附带了 ${imagePaths.length} 张图片：`);
@@ -150,6 +174,23 @@ function buildPrompt({ request, url, title, selection, linkedDocs, cursorPos, im
     "",
   ] : [];
 
+  // 执行要求：挂了根目录(linkedDir)就切到"文档感知的 Claude Code"基调，否则保持原文档导向（零回归）
+  const reqs = [];
+  if (linkedDir) {
+    reqs.push("你是运行在上述工作目录中的 Claude Code，可用 Read/Edit/Write/Bash/Grep/Glob 直接读写其中文件、运行命令、使用 git。");
+    reqs.push("按用户请求判断意图：纯代码任务就直接操作工作目录里的文件；若需要把内容整理进 WPS 文档，则用 WPS-AirPage-Skill 写入当前主文档；二者可结合。");
+  } else {
+    reqs.push("如果需要操作文档，使用 WPS-AirPage-Skill，先从文档链接解析 file_id（短链由 CLI 自动解析）。");
+    reqs.push("如果是写操作，默认写入当前主文档；如需操作关联文档请先确认。");
+    reqs.push("可以从关联文档中 query 读取内容，作为参考素材写入主文档。");
+  }
+  if (Array.isArray(refDirs) && refDirs.length > 0) {
+    reqs.push("可用 Read/Grep/Glob 配合绝对路径查看「参考目录」中的代码与文件作为背景/素材；除非用户明确要求，不要修改参考目录里的文件。");
+  }
+  reqs.push("如果用户请求里有'调研''查一下''搜索'等意图，先用 WebSearch 工具收集信息，再写入文档。");
+  reqs.push("简洁地总结你做了什么、写到了哪里。");
+  reqs.push("所有思考过程和最终回复必须使用中文。");
+
   return [
     "我正在 WPS 365 智能文档（AirPage / kdocs）中工作。",
     "", "上下文：", ctxLines.join("\n") || "（无上下文）", "",
@@ -157,12 +198,7 @@ function buildPrompt({ request, url, title, selection, linkedDocs, cursorPos, im
     ...imageFirstSteps,
     "",
     "执行要求：",
-    "1. 如果需要操作文档，使用 WPS-AirPage-Skill，先从文档链接解析 file_id（短链由 CLI 自动解析）。",
-    "2. 如果是写操作，默认写入当前主文档；如需操作关联文档请先确认。",
-    "3. 可以从关联文档中 query 读取内容，作为参考素材写入主文档。",
-    "4. 如果用户请求里有'调研''查一下''搜索'等意图，先用 WebSearch 工具收集信息，再写入文档。",
-    "5. 简洁地总结你做了什么、写到了哪里。",
-    "6. 所有思考过程和最终回复必须使用中文。",
+    ...reqs.map((r, i) => `${i + 1}. ${r}`),
     ...(engine?.promptExtra ? ["", engine.promptExtra] : []),
   ].join("\n");
 }
@@ -361,7 +397,7 @@ const ENGINES = {
         args.push("--resume", engineSessionId);
         if (forkSession) args.push("--fork-session");
       }
-      return { bin: CLAUDE_BIN, args, cwd: (isResume && engineCwd) ? engineCwd : process.cwd() };
+      return { bin: CLAUDE_BIN, args, cwd: engineCwd || process.cwd() };
     },
 
     createHandler(session) {
@@ -540,7 +576,7 @@ const ENGINES = {
       const args = ["exec"];
       if (isResume) args.push("resume", engineSessionId);
       args.push("--json", "--dangerously-bypass-approvals-and-sandbox", "--", prompt);
-      return { bin: CODEX_BIN, args, cwd: (isResume && engineCwd) ? engineCwd : process.cwd() };
+      return { bin: CODEX_BIN, args, cwd: engineCwd || process.cwd() };
     },
 
     createHandler(session) {
@@ -659,9 +695,77 @@ app.get("/local-sessions", async (req, res) => {
   }
 });
 
+// ========== Directory browser (link a local dir to a session) ==========
+const DIR_LIST_CAP = 400;
+
+// Browse one directory level: list sub-directories, flag git repos, give parent for "up"
+app.get("/list-dir", async (req, res) => {
+  try {
+    const os = await import("os");
+    const fs = await import("fs");
+    const path = await import("path");
+    const home = os.homedir();
+    let target = (req.query.path || "").trim() || home;
+    if (target === "~") target = home;
+    else if (target.startsWith("~/")) target = path.join(home, target.slice(2));
+    target = path.resolve(target);
+
+    const stat = await fs.promises.stat(target).catch(() => null);
+    if (!stat || !stat.isDirectory()) return res.json({ ok: false, error: "目录不存在或不是文件夹" });
+
+    const dirents = await fs.promises.readdir(target, { withFileTypes: true }).catch(() => []);
+    const entries = [];
+    for (const e of dirents) {
+      if (!e.isDirectory() || e.name.startsWith(".")) continue; // skip files & hidden dirs
+      const full = path.join(target, e.name);
+      const isGit = await fs.promises.stat(path.join(full, ".git")).then(() => true).catch(() => false);
+      entries.push({ name: e.name, path: full, isGit });
+      if (entries.length >= DIR_LIST_CAP) break;
+    }
+    entries.sort((a, b) => (Number(b.isGit) - Number(a.isGit)) || a.name.localeCompare(b.name));
+    const parent = path.dirname(target);
+    const isGitRepo = await fs.promises.stat(path.join(target, ".git")).then(() => true).catch(() => false);
+    res.json({ ok: true, path: target, parent: parent === target ? null : parent, home, isGitRepo, entries });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+// Recently-used directories — derived from engine session history (their cwd)
+app.get("/recent-dirs", async (_req, res) => {
+  try {
+    const os = await import("os");
+    const fs = await import("fs");
+    const path = await import("path");
+    const home = os.homedir();
+    const seen = new Map(); // cwd -> latest updatedAt
+    for (const engine of Object.values(ENGINES)) {
+      try {
+        const list = await engine.listSessions(new Set());
+        for (const s of list) {
+          if (!s.cwd) continue;
+          const prev = seen.get(s.cwd);
+          if (prev === undefined || s.updatedAt > prev) seen.set(s.cwd, s.updatedAt);
+        }
+      } catch (_) {}
+    }
+    const dirs = [];
+    for (const [cwd, updatedAt] of seen) {
+      const ok = await fs.promises.stat(cwd).then((st) => st.isDirectory()).catch(() => false);
+      if (!ok) continue;
+      const isGit = await fs.promises.stat(path.join(cwd, ".git")).then(() => true).catch(() => false);
+      dirs.push({ path: cwd, label: cwd.startsWith(home) ? "~" + cwd.slice(home.length) : cwd, isGit, updatedAt });
+    }
+    dirs.sort((a, b) => b.updatedAt - a.updatedAt);
+    res.json({ ok: true, dirs: dirs.slice(0, 8) });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 // Unified start — dispatches to the right engine adapter
 app.post("/start", async (req, res) => {
-  const { request, engine: reqEngine, engineSessionId, engineCwd, forkSession, images } = req.body || {};
+  const { request, engine: reqEngine, engineSessionId, engineCwd, refDirs, forkSession, images } = req.body || {};
   if (!request) return res.status(400).json({ ok: false, error: "缺少 request 字段" });
 
   const engineId = reqEngine || "claude";
@@ -691,16 +795,45 @@ app.post("/start", async (req, res) => {
     }
   }
 
-  const prompt = buildPrompt({ ...req.body, imagePaths }, engine);
   const isResume = !!engineSessionId;
+
+  // Feature ①: resolve & validate the session working directory (root dir).
+  // A new rooted session with a bad path fails clearly; resume falls back to the raw value.
+  let resolvedCwd = null;
+  if (engineCwd) {
+    resolvedCwd = await resolveDir(engineCwd);
+    if (!resolvedCwd) {
+      if (isResume) {
+        resolvedCwd = engineCwd; // best-effort: let the engine attempt the resume
+      } else {
+        pushEvent(session, { type: "error", error: `工作目录不存在或不可访问：${engineCwd}` });
+        pushEvent(session, { type: "close" });
+        markDone(session);
+        return res.json({ ok: true, sessionId: session.id });
+      }
+    }
+  }
+
+  // Feature ②: resolve & validate reference directories (read-only background, drop invalid).
+  const resolvedRefDirs = [];
+  if (Array.isArray(refDirs) && refDirs.length > 0) {
+    for (const rd of refDirs) {
+      const r = await resolveDir(typeof rd === "string" ? rd : rd?.path);
+      if (r && r !== resolvedCwd && !resolvedRefDirs.includes(r)) resolvedRefDirs.push(r);
+    }
+  }
+
+  const prompt = buildPrompt({ ...req.body, imagePaths, linkedDir: resolvedCwd, refDirs: resolvedRefDirs }, engine);
 
   console.log(`\n${C.cyan}${C.bold}━━━ [${session.id}] ${engine.label} ${isResume ? "Resume" : "New"} ━━━${C.reset}`);
   if (isResume) console.log(`${C.dim}   resuming ${engine.label} session: ${engineSessionId}${C.reset}`);
+  if (resolvedCwd) console.log(`${C.green}   📁 cwd: ${resolvedCwd}${C.reset}`);
+  if (resolvedRefDirs.length) console.log(`${C.dim}   📎 ref: ${resolvedRefDirs.join(", ")}${C.reset}`);
   console.log(`${C.dim}${prompt}${C.reset}\n`);
 
   pushEvent(session, { type: "status", message: "正在启动…" });
 
-  const spawnCfg = engine.buildSpawn(prompt, { engineSessionId, engineCwd, forkSession });
+  const spawnCfg = engine.buildSpawn(prompt, { engineSessionId, engineCwd: resolvedCwd, forkSession });
   const proc = spawn(spawnCfg.bin, spawnCfg.args, { env: process.env, shell: false, stdio: ["ignore", "pipe", "pipe"], cwd: spawnCfg.cwd });
   session.proc = proc;
 

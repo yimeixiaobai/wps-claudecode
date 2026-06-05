@@ -58,6 +58,7 @@
     plus: `<svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 5v14M5 12h14" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg>`,
     list: `<svg viewBox="0 0 24 24" width="14" height="14"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg>`,
     link: `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg>`,
+    folder: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M3 7.5A1.5 1.5 0 014.5 6h3.7a1.5 1.5 0 011.06.44L10.83 7.7H19.5A1.5 1.5 0 0121 9.2v8.3a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 17.5v-10z" stroke="currentColor" fill="none" stroke-width="1.7" stroke-linejoin="round"/></svg>`,
     copy: `<svg viewBox="0 0 24 24" width="12" height="12"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" fill="none" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
     docWrite: `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" fill="none" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
     quote: `<svg viewBox="0 0 16 16" width="13" height="13"><path d="M4 2v3a6 6 0 006 6h2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 9l2 2-2 2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
@@ -91,7 +92,9 @@
     <button class="cc-stop-btn">${ICON.stop} 停止生成</button>
     <div class="cc-input-area">
       <div class="cc-quick-actions"></div>
+      <div class="cc-attach-row"><span class="cc-attach-docs"></span><span class="cc-attach-dirs"></span></div>
       <div class="cc-linked-docs"></div>
+      <div class="cc-linked-dirs"></div>
       <div class="cc-selection-bar"></div>
       <div class="cc-image-previews"></div>
       <div class="cc-input-wrapper">
@@ -113,6 +116,9 @@
   const msgsWrap = panel.querySelector(".cc-messages-wrap");
   const selectionBar = panel.querySelector(".cc-selection-bar");
   const linkedDocsEl = panel.querySelector(".cc-linked-docs");
+  const linkedDirsEl = panel.querySelector(".cc-linked-dirs");
+  const attachDocsEl = panel.querySelector(".cc-attach-docs");
+  const attachDirsEl = panel.querySelector(".cc-attach-dirs");
   let linkedDocs = []; // [{ url, title }]
   let pendingImages = []; // [{ data: base64, name: string, type: string }]
   const sessionListEl = panel.querySelector(".cc-session-list");
@@ -124,10 +130,20 @@
   function renderEngineSwitch() {
     const m = ENGINE_META[currentEngine] || { label: currentEngine, color: "#888", title: currentEngine };
     engineSwitchBtn.innerHTML = `<span class="cc-engine-dot" style="background:${m.color}"></span>${m.label} <span class="cc-engine-arrow">▾</span>`;
-    headerTitleEl.innerHTML = `${ICON.claude} ${m.title}`;
+    renderHeaderTitle();
     const conv = activeConv();
     const welcome = conv?.container.querySelector(".cc-welcome-title");
     if (welcome) welcome.textContent = m.title;
+  }
+  // 标题栏：会话已绑定工作目录且已激活 → 显示「📂 目录名」，否则显示引擎标题
+  function renderHeaderTitle() {
+    const conv = activeConv();
+    if (conv && conv.engineCwd && (conv.engineSessionId || isStreaming)) {
+      headerTitleEl.innerHTML = `${ICON.folder}<span class="cc-title-dir" title="工作目录：${esc(conv.engineCwd)}（会话已绑定此目录，换目录请新建会话）">${esc(basename(conv.engineCwd))}</span>`;
+    } else {
+      const m = ENGINE_META[currentEngine] || { title: currentEngine };
+      headerTitleEl.innerHTML = `${ICON.claude} ${esc(m.title)}`;
+    }
   }
   engineSwitchBtn.addEventListener("click", () => {
     const idx = ENGINE_IDS.indexOf(currentEngine);
@@ -171,7 +187,7 @@
   function makeConv(title) {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const container = createConvContainer();
-    return { id, engine: currentEngine, engineSessionId: null, engineCwd: null, isImported: false, originSessionId: null, title: title || "新会话", container, createdAt: Date.now() };
+    return { id, engine: currentEngine, engineSessionId: null, engineCwd: null, refDirs: [], isImported: false, originSessionId: null, title: title || "新会话", container, createdAt: Date.now() };
   }
 
   function showConv(id) {
@@ -184,6 +200,7 @@
     activeConvId = id;
     currentEngine = conv.engine || "claude";
     renderEngineSwitch();
+    renderLinkedDirs();
     hideSessionList();
   }
 
@@ -222,7 +239,7 @@
   function persistIndex() {
     try {
       chrome.storage.local.set({ [STORAGE_KEY]: convs.map(c => ({
-        id: c.id, engine: c.engine || "claude", engineSessionId: c.engineSessionId, engineCwd: c.engineCwd, isImported: c.isImported, originSessionId: c.originSessionId, title: c.title, createdAt: c.createdAt,
+        id: c.id, engine: c.engine || "claude", engineSessionId: c.engineSessionId, engineCwd: c.engineCwd, refDirs: c.refDirs || [], isImported: c.isImported, originSessionId: c.originSessionId, title: c.title, createdAt: c.createdAt,
         html: c.container.innerHTML.replace(/src="data:image\/[^"]+"/g, 'src="" data-stripped="1"'),
       }))});
     } catch (_) {}
@@ -257,7 +274,7 @@
         rebindContainerEvents(container);
         container.style.display = "none";
         msgsWrap.appendChild(container);
-        convs.push({ id: s.id, engine: s.engine || "claude", engineSessionId: s.engineSessionId || s.claudeSessionId || s.codexSessionId || null, engineCwd: s.engineCwd || s.claudeCwd || s.codexCwd || null, isImported: !!s.isImported, originSessionId: s.originSessionId || null, title: s.title, container, createdAt: s.createdAt });
+        convs.push({ id: s.id, engine: s.engine || "claude", engineSessionId: s.engineSessionId || s.claudeSessionId || s.codexSessionId || null, engineCwd: s.engineCwd || s.claudeCwd || s.codexCwd || null, refDirs: Array.isArray(s.refDirs) ? s.refDirs : [], isImported: !!s.isImported, originSessionId: s.originSessionId || null, title: s.title, container, createdAt: s.createdAt });
       });
     } catch (_) {}
     if (convs.length > 0) showConv(convs[0].id);
@@ -337,6 +354,7 @@
     conv.engine = s.engine || "claude";
     conv.engineSessionId = s.sessionId;
     conv.engineCwd = s.cwd || null;
+    conv.refDirs = [];
     conv.isImported = true;
     conv.originSessionId = s.sessionId;
     convs.unshift(conv);
@@ -471,14 +489,15 @@
   let linkExpanded = false;
 
   function renderLinkedDocs() {
+    attachDocsEl.innerHTML = "";
     linkedDocsEl.innerHTML = "";
     const toggleBtn = document.createElement("button");
     toggleBtn.className = "cc-link-toggle";
     toggleBtn.innerHTML = linkedDocs.length > 0
       ? `${ICON.link} 关联文档 (${linkedDocs.length}) <span class="cc-link-toggle-arrow">${linkExpanded ? "▼" : "▶"}</span>`
-      : `${ICON.plus} 关联文档`;
+      : `${ICON.link} 关联文档`;
     toggleBtn.addEventListener("click", () => { linkExpanded = !linkExpanded; renderLinkedDocs(); });
-    linkedDocsEl.appendChild(toggleBtn);
+    attachDocsEl.appendChild(toggleBtn);
     if (!linkExpanded) return;
 
     linkedDocs.forEach((doc, i) => {
@@ -528,6 +547,252 @@
   }
 
   renderLinkedDocs();
+
+  // ========== LINKED DIRS (① 会话根目录 / ② 附加参考目录) ==========
+  function shortenPath(p) {
+    if (!p) return "";
+    return p.replace(/^\/Users\/[^/]+/, "~").replace(/^\/home\/[^/]+/, "~");
+  }
+  function basename(p) {
+    if (!p) return "";
+    const s = String(p).replace(/\/+$/, "");
+    return s.slice(s.lastIndexOf("/") + 1) || s;
+  }
+
+  async function getRecentDirs() {
+    let client = [];
+    try { const d = await chrome.storage.local.get("cc_recent_dirs"); client = d.cc_recent_dirs || []; } catch (_) {}
+    let server = [];
+    try { const r = await fetch(BRIDGE + "/recent-dirs"); const j = await r.json(); if (j.ok) server = j.dirs || []; } catch (_) {}
+    const merged = [], seen = new Set();
+    for (const x of [...client, ...server]) {
+      if (x && x.path && !seen.has(x.path)) { seen.add(x.path); merged.push({ path: x.path, label: x.label || shortenPath(x.path), isGit: !!x.isGit }); }
+    }
+    return merged.slice(0, 10);
+  }
+  async function pushRecentDir(dir) {
+    let cur = [];
+    try { const d = await chrome.storage.local.get("cc_recent_dirs"); cur = d.cc_recent_dirs || []; } catch (_) {}
+    cur = cur.filter(x => x.path !== dir.path);
+    cur.unshift({ path: dir.path, label: dir.label || shortenPath(dir.path), isGit: !!dir.isGit });
+    try { chrome.storage.local.set({ cc_recent_dirs: cur.slice(0, 10) }); } catch (_) {}
+  }
+
+  // --- Directory picker overlay (shared by root & ref) ---
+  const dirPickerEl = document.createElement("div");
+  dirPickerEl.className = "cc-dir-picker";
+  panel.appendChild(dirPickerEl);
+  dirPickerEl.addEventListener("click", (e) => { if (e.target === dirPickerEl) closeDirPicker(); });
+  let dpState = { mode: "root", onPick: null, title: "", path: null, parent: null, home: null, isGitRepo: false, entries: [], recents: [], loading: false, error: "" };
+
+  async function openDirPicker(opts) {
+    dpState = { mode: opts.mode || "root", onPick: opts.onPick, title: opts.title || "选择目录", path: null, parent: null, home: null, isGitRepo: false, entries: [], recents: [], loading: true, error: "" };
+    dirPickerEl.classList.add("cc-dp-visible");
+    renderDirPicker();
+    dpState.recents = await getRecentDirs();
+    await browseDir("");
+  }
+  function closeDirPicker() { dirPickerEl.classList.remove("cc-dp-visible"); dpState.onPick = null; }
+
+  async function browseDir(path) {
+    dpState.loading = true; dpState.error = ""; renderDirPicker();
+    try {
+      const r = await fetch(BRIDGE + "/list-dir?path=" + encodeURIComponent(path || ""));
+      const d = await r.json();
+      if (!d.ok) { dpState.loading = false; dpState.error = d.error || "无法打开目录"; renderDirPicker(); return; }
+      dpState.path = d.path; dpState.parent = d.parent; dpState.home = d.home; dpState.isGitRepo = !!d.isGitRepo; dpState.entries = d.entries || []; dpState.loading = false;
+      renderDirPicker();
+    } catch (_) {
+      dpState.loading = false; dpState.error = "无法连接 Bridge"; renderDirPicker();
+    }
+  }
+
+  function commitDir(dir) {
+    const cb = dpState.onPick;
+    closeDirPicker();
+    if (cb) cb(dir);
+    pushRecentDir(dir);
+  }
+  function rowIsGit(path) {
+    const e = dpState.entries.find(x => x.path === path) || dpState.recents.find(x => x.path === path);
+    return e ? !!e.isGit : false;
+  }
+  async function manualPick(raw) {
+    const v = (raw || "").trim();
+    if (!v) return;
+    try {
+      const r = await fetch(BRIDGE + "/list-dir?path=" + encodeURIComponent(v));
+      const d = await r.json();
+      if (!d.ok) { dpState.error = d.error || "目录无效"; renderDirPicker(); return; }
+      commitDir({ path: d.path, label: shortenPath(d.path), isGit: !!d.isGitRepo });
+    } catch (_) { dpState.error = "无法连接 Bridge"; renderDirPicker(); }
+  }
+
+  // --- 手动输入框：联想下拉 + Tab 补全（数据源同为 /list-dir）---
+  let dpSugItems = [], dpSugActive = -1, dpSugTimer = null;
+  function dpSplitPath(v) {
+    const slash = v.lastIndexOf("/");
+    if (slash < 0) return { dir: v, prefix: "" };
+    return { dir: v.slice(0, slash) || "/", prefix: v.slice(slash + 1) };
+  }
+  function dpJoin(dir, name) { return (dir.endsWith("/") ? dir : dir + "/") + name; }
+  function dpCommonPrefix(names) {
+    if (!names.length) return "";
+    let p = names[0];
+    for (const n of names) { let i = 0; while (i < p.length && i < n.length && p[i].toLowerCase() === n[i].toLowerCase()) i++; p = p.slice(0, i); }
+    return p;
+  }
+  async function dpFetchEntries(dir) {
+    try { const r = await fetch(BRIDGE + "/list-dir?path=" + encodeURIComponent(dir)); const d = await r.json(); return d.ok ? (d.entries || []) : []; } catch (_) { return []; }
+  }
+  function dpRenderSug() {
+    const sug = dirPickerEl.querySelector(".cc-dp-suggest");
+    if (!sug) return;
+    if (!dpSugItems.length) { sug.innerHTML = ""; sug.style.display = "none"; return; }
+    sug.style.display = "block";
+    sug.innerHTML = dpSugItems.map((e, i) => `<div class="cc-dp-sug${i === dpSugActive ? " cc-dp-sug-on" : ""}" data-i="${i}"><span class="cc-dp-sug-ico">${e.isGit ? `<span class="cc-git-badge">git</span>` : ICON.folder}</span><span class="cc-dp-sug-name">${esc(e.name)}</span></div>`).join("");
+    sug.querySelectorAll(".cc-dp-sug").forEach(el => el.addEventListener("mousedown", (ev) => { ev.preventDefault(); dpApplySug(dpSugItems[+el.dataset.i]); }));
+    if (dpSugActive >= 0) { const on = sug.querySelector(".cc-dp-sug-on"); if (on) on.scrollIntoView({ block: "nearest" }); }
+  }
+  function dpApplySug(item) {
+    const inp = dirPickerEl.querySelector(".cc-dp-input");
+    if (!inp || !item) return;
+    inp.value = item.path + "/";
+    dpSugItems = []; dpSugActive = -1; dpRenderSug(); inp.focus(); dpUpdateSug();
+  }
+  async function dpUpdateSug() {
+    const inp = dirPickerEl.querySelector(".cc-dp-input");
+    if (!inp) return;
+    const v = inp.value.trim();
+    if (!v || !(v.startsWith("/") || v.startsWith("~"))) { dpSugItems = []; dpSugActive = -1; dpRenderSug(); return; }
+    const { dir, prefix } = dpSplitPath(v);
+    const entries = await dpFetchEntries(dir);
+    const pl = prefix.toLowerCase();
+    dpSugItems = entries.filter(e => e.name.toLowerCase().startsWith(pl)).slice(0, 50);
+    dpSugActive = -1; dpRenderSug();
+  }
+  async function dpTabComplete() {
+    const inp = dirPickerEl.querySelector(".cc-dp-input");
+    if (!inp) return;
+    const v = inp.value.trim();
+    if (!v || !(v.startsWith("/") || v.startsWith("~"))) return;
+    const { dir, prefix } = dpSplitPath(v);
+    const entries = await dpFetchEntries(dir);
+    const matches = entries.filter(e => e.name.toLowerCase().startsWith(prefix.toLowerCase()));
+    if (!matches.length) return;
+    if (matches.length === 1) { inp.value = matches[0].path + "/"; dpSugItems = []; dpSugActive = -1; dpRenderSug(); dpUpdateSug(); return; }
+    const cp = dpCommonPrefix(matches.map(e => e.name));
+    if (cp.length > prefix.length) inp.value = dpJoin(dir, cp);
+    dpSugItems = matches.slice(0, 50); dpSugActive = -1; dpRenderSug();
+  }
+
+  function renderDirPicker() {
+    const s = dpState;
+    let html = `<div class="cc-dp-box"><div class="cc-dp-head"><span class="cc-dp-title">${esc(s.title)}</span><button class="cc-dp-close" title="关闭">×</button></div>`;
+    html += `<div class="cc-dp-bar">`;
+    html += s.parent ? `<button class="cc-dp-up" data-up="${esc(s.parent)}">↑ 上一级</button>` : `<span class="cc-dp-up cc-dp-up-off">↑</span>`;
+    html += `<span class="cc-dp-cwd" title="${esc(s.path || "")}">${esc(s.path ? shortenPath(s.path) : "…")}</span>`;
+    if (s.path) html += `<button class="cc-dp-use" data-use="${esc(s.path)}">${s.mode === "root" ? "在此启动 ✓" : "选用 ✓"}</button>`;
+    html += `</div><div class="cc-dp-scroll">`;
+    // 「最近使用」只在初始（家目录）那一屏显示；一旦点进子目录就隐藏，避免浏览时占位
+    if (s.recents.length && s.path && s.path === s.home) {
+      html += `<div class="cc-dp-section">最近使用</div>`;
+      for (const d of s.recents) {
+        html += `<div class="cc-dp-row" data-pick="${esc(d.path)}"><span class="cc-dp-ico">${d.isGit ? `<span class="cc-git-badge">git</span>` : ICON.folder}</span><span class="cc-dp-name">${esc(d.label || shortenPath(d.path))}</span><button class="cc-dp-rowbtn" data-pick="${esc(d.path)}">选定</button></div>`;
+      }
+    }
+    html += `<div class="cc-dp-section">${s.path ? esc(shortenPath(s.path)) + " 内" : "子目录"}</div>`;
+    if (s.loading) html += `<div class="cc-dp-msg">加载中…</div>`;
+    else if (s.error) html += `<div class="cc-dp-msg cc-dp-msg-err">${esc(s.error)}</div>`;
+    else if (!s.entries.length) html += `<div class="cc-dp-msg">（没有子目录）</div>`;
+    else for (const e of s.entries) {
+      html += `<div class="cc-dp-row" data-enter="${esc(e.path)}"><span class="cc-dp-ico">${e.isGit ? `<span class="cc-git-badge">git</span>` : ICON.folder}</span><span class="cc-dp-name">${esc(e.name)}</span><button class="cc-dp-rowbtn" data-pick="${esc(e.path)}">选定</button></div>`;
+    }
+    html += `</div><div class="cc-dp-manual"><div class="cc-dp-suggest"></div><input class="cc-dp-input" placeholder="输入绝对路径：Tab 补全 · ↑↓ 选择 · 回车确认" autocomplete="off" spellcheck="false" /></div></div>`;
+    dirPickerEl.innerHTML = html;
+
+    dirPickerEl.querySelector(".cc-dp-close").addEventListener("click", closeDirPicker);
+    const up = dirPickerEl.querySelector(".cc-dp-up[data-up]");
+    if (up) up.addEventListener("click", () => browseDir(up.dataset.up));
+    const use = dirPickerEl.querySelector(".cc-dp-use");
+    if (use) use.addEventListener("click", () => commitDir({ path: use.dataset.use, label: shortenPath(use.dataset.use), isGit: s.isGitRepo }));
+    dirPickerEl.querySelectorAll(".cc-dp-row").forEach(row => {
+      row.addEventListener("click", (e) => {
+        if (e.target.closest(".cc-dp-rowbtn")) return;
+        if (row.dataset.enter) browseDir(row.dataset.enter);
+        else if (row.dataset.pick) commitDir({ path: row.dataset.pick, label: shortenPath(row.dataset.pick), isGit: rowIsGit(row.dataset.pick) });
+      });
+    });
+    dirPickerEl.querySelectorAll(".cc-dp-rowbtn").forEach(btn => {
+      btn.addEventListener("click", (e) => { e.stopPropagation(); commitDir({ path: btn.dataset.pick, label: shortenPath(btn.dataset.pick), isGit: rowIsGit(btn.dataset.pick) }); });
+    });
+    const inp = dirPickerEl.querySelector(".cc-dp-input");
+    if (inp) {
+      inp.addEventListener("input", () => { clearTimeout(dpSugTimer); dpSugTimer = setTimeout(dpUpdateSug, 180); });
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Tab") { e.preventDefault(); dpTabComplete(); return; }
+        if (e.key === "ArrowDown" && dpSugItems.length) { e.preventDefault(); dpSugActive = Math.min(dpSugActive + 1, dpSugItems.length - 1); dpRenderSug(); return; }
+        if (e.key === "ArrowUp" && dpSugItems.length) { e.preventDefault(); dpSugActive = Math.max(dpSugActive - 1, -1); dpRenderSug(); return; }
+        if (e.key === "Enter") { e.preventDefault(); if (dpSugActive >= 0 && dpSugItems[dpSugActive]) dpApplySug(dpSugItems[dpSugActive]); else manualPick(inp.value); return; }
+        if (e.key === "Escape" && dpSugItems.length) { e.stopPropagation(); dpSugItems = []; dpSugActive = -1; dpRenderSug(); }
+      });
+      inp.addEventListener("blur", () => setTimeout(() => { dpSugItems = []; dpSugActive = -1; dpRenderSug(); }, 150));
+    }
+  }
+
+  // --- ① 会话根目录：入口/已选 chip 放在新建会话的欢迎页中央 ---
+  function renderWelcomeDir(conv) {
+    if (!conv) return;
+    const el = conv.container.querySelector(".cc-welcome-dir");
+    if (!el) return; // 欢迎页已被对话内容替换
+    el.innerHTML = "";
+    if (conv.engineCwd) {
+      const chip = document.createElement("div");
+      chip.className = "cc-dir-chip cc-dir-root";
+      chip.innerHTML = `<span class="cc-dir-role">工作目录</span><span class="cc-dir-name" title="${esc(conv.engineCwd)}">${esc(basename(conv.engineCwd))}</span><button class="cc-dir-rm" title="取消">×</button>`;
+      chip.querySelector(".cc-dir-rm").addEventListener("click", () => { conv.engineCwd = null; persistIndex(); renderLinkedDirs(); });
+      el.appendChild(chip);
+    } else {
+      const btn = document.createElement("button");
+      btn.className = "cc-dir-rootbtn";
+      btn.innerHTML = `${ICON.folder} 选择工作目录，在此启动 Claude Code`;
+      btn.addEventListener("click", () => openDirPicker({ mode: "root", title: "选择会话根目录（在此启动 Claude Code）", onPick: (d) => { conv.engineCwd = d.path; persistIndex(); renderLinkedDirs(); } }));
+      el.appendChild(btn);
+    }
+  }
+
+  // --- 输入区：会话激活后只显示 ② 附加参考目录（① 工作目录已移到标题栏）---
+  function renderLinkedDirs() {
+    const conv = activeConv();
+    renderWelcomeDir(conv);
+    renderHeaderTitle();
+    linkedDirsEl.innerHTML = "";
+    attachDirsEl.innerHTML = "";
+    if (!conv) return;
+    const active = !!conv.engineSessionId || isStreaming;
+    if (!active) return; // 会话开始前，根目录入口在欢迎页，输入区保持干净
+
+    // ① 工作目录已上移到标题栏（renderHeaderTitle），输入区只保留参考目录
+    // ② 附加参考目录
+    (conv.refDirs || []).forEach((d, i) => {
+      const chip = document.createElement("div");
+      chip.className = "cc-dir-chip cc-dir-ref";
+      chip.innerHTML = `<span class="cc-dir-role">参考</span><span class="cc-dir-name" title="${esc(d.path)}">${esc(basename(d.path))}</span>${d.isGit ? `<span class="cc-git-badge">git</span>` : ""}<button class="cc-dir-rm" title="移除">×</button>`;
+      chip.querySelector(".cc-dir-rm").addEventListener("click", () => { conv.refDirs.splice(i, 1); persistIndex(); renderLinkedDirs(); });
+      linkedDirsEl.appendChild(chip);
+    });
+    const addBtn = document.createElement("button");
+    addBtn.className = "cc-link-toggle cc-dir-addref";
+    addBtn.innerHTML = `${ICON.link} 关联目录`;
+    addBtn.addEventListener("click", () => openDirPicker({ mode: "ref", title: "关联参考目录（只读背景资料）", onPick: (d) => {
+      if (!conv.refDirs) conv.refDirs = [];
+      if (conv.engineCwd === d.path) return;
+      if (!conv.refDirs.some(x => x.path === d.path)) conv.refDirs.push(d);
+      persistIndex(); renderLinkedDirs();
+    } }));
+    attachDirsEl.appendChild(addBtn);
+  }
+  renderLinkedDirs();
 
   // ========== IMAGE ATTACHMENTS ==========
   const imgBtn = panel.querySelector(".cc-img-btn");
@@ -600,7 +865,7 @@
   async function checkHealth() { try { const r = await fetch(BRIDGE + "/health", { signal: AbortSignal.timeout(3000) }); bridgeOnline = !!(await r.json()).ok; } catch (_) { bridgeOnline = false; } statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline"); }
 
   // ========== HELPERS ==========
-  function getWelcomeHTML() { const t = (ENGINE_META[currentEngine] || {}).title || "Claude Code"; return `<div class="cc-welcome"><div class="cc-welcome-title">${t}</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-shortcuts"><span><kbd>${MOD_KEY}</kbd>+<kbd>J</kbd> 打开</span><span><kbd>↵</kbd> 发送</span></div></div>`; }
+  function getWelcomeHTML() { const t = (ENGINE_META[currentEngine] || {}).title || "Claude Code"; return `<div class="cc-welcome"><div class="cc-welcome-title">${t}</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-dir"></div><div class="cc-welcome-shortcuts"><span><kbd>${MOD_KEY}</kbd>+<kbd>J</kbd> 打开</span><span><kbd>↵</kbd> 发送</span></div></div>`; }
 
   function addUserMsg(container, text, images) {
     const w = container.querySelector(".cc-welcome"); if (w) w.remove();
@@ -701,6 +966,7 @@
     pendingImages = []; renderImagePreviews();
 
     isStreaming = true; sendBtn.disabled = true; stopBtn.classList.add("cc-active"); fab.classList.add("cc-streaming");
+    renderLinkedDirs(); // 发送即锁定根目录 chip
     addUserMsg(container, text || (sentImages.length > 0 ? "[图片]" : ""), sentImages);
     const { activityEl, replyEl, actionsEl } = addAssistantMsg(container);
     inputEl.value = ""; inputEl.style.height = "auto";
@@ -737,7 +1003,7 @@
 
     function handleEvent(ev) {
       switch (ev.type) {
-        case "engine_session": { const c = getConv(targetConvId); if (c) { c.engineSessionId = ev.engineSessionId; c.isImported = false; } LOG("engine session:", ev.engineSessionId); break; }
+        case "engine_session": { const c = getConv(targetConvId); if (c) { c.engineSessionId = ev.engineSessionId; c.isImported = false; } if (targetConvId === activeConvId) renderLinkedDirs(); LOG("engine session:", ev.engineSessionId); break; }
         case "status": updateStatus(activityEl, ev.message); break;
         case "thinking_start": clearSteps(activityEl, "status"); if (!activityEl.querySelector('.cc-step[data-type="thinking"]')) addStep(activityEl, "thinking", "思考中…"); break;
         case "thinking": break;
@@ -783,7 +1049,7 @@
     try {
       const startRes = await fetch(BRIDGE + "/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request: text || "请分析图片内容", engine: conv.engine || "claude", engineSessionId: conv.engineSessionId, engineCwd: conv.engineCwd, forkSession: needsFork, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, cursorPos: { from: cachedCursorFrom, to: cachedCursorTo, context: cachedCursorCtx }, images: sentImages.length > 0 ? sentImages : undefined }),
+        body: JSON.stringify({ request: text || "请分析图片内容", engine: conv.engine || "claude", engineSessionId: conv.engineSessionId, engineCwd: conv.engineCwd, refDirs: (conv.refDirs || []).map(d => d.path), forkSession: needsFork, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, cursorPos: { from: cachedCursorFrom, to: cachedCursorTo, context: cachedCursorCtx }, images: sentImages.length > 0 ? sentImages : undefined }),
       });
       const d = await startRes.json(); if (!d.ok) throw new Error(d.error || "启动失败");
       sessionId = d.sessionId; LOG("session:", sessionId);
@@ -851,6 +1117,7 @@
       if (renderFrame) cancelAnimationFrame(renderFrame);
       isStreaming = false; sendBtn.disabled = false; stopBtn.classList.remove("cc-active"); fab.classList.remove("cc-streaming"); abortController = null;
       persistIndex();
+      renderLinkedDirs();
     }
   }
 
