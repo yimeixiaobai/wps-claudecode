@@ -22,7 +22,7 @@ var __csLocal = {
 
 
 // CSS
-(function(){var s=document.createElement("style");s.textContent="/* Claude Code for WPS 365 */\n\n@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');\n\n:root {\n  /* Surface palette — clean light base */\n  --cc-surface-0: #f5f5f5;\n  --cc-surface-1: #ffffff;\n  --cc-surface-2: #f9f9fa;\n  --cc-surface-3: #e8e8eb;\n  --cc-surface-4: #d5d5da;\n\n  /* Text hierarchy */\n  --cc-text-primary: #1a1a1e;\n  --cc-text-secondary: #5a5a63;\n  --cc-text-muted: #8a8a95;\n  --cc-text-ghost: #b0b0ba;\n\n  /* Claude orange accent */\n  --cc-ember: #D97757;\n  --cc-ember-hover: #c4684a;\n  --cc-ember-glow: rgba(217, 119, 87, 0.2);\n  --cc-ember-dim: rgba(217, 119, 87, 0.08);\n\n  /* Semantic */\n  --cc-success: #5cb87a;\n  --cc-error: #e05c5c;\n  --cc-error-bg: rgba(224, 92, 92, 0.1);\n\n  /* Radii & type */\n  --cc-r: 12px;\n  --cc-r-sm: 8px;\n  --cc-font: 'DM Sans', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;\n  --cc-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;\n}\n\n/* ────────────────── FAB ────────────────── */\n.cc-fab {\n  position: fixed;\n  right: 24px;\n  bottom: 24px;\n  width: 46px;\n  height: 46px;\n  border-radius: 50%;\n  background: var(--cc-ember);\n  color: #fff;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  cursor: pointer;\n  box-shadow:\n    0 3px 14px rgba(217,119,87,0.35),\n    0 1px 3px rgba(0,0,0,0.1);\n  z-index: 99999;\n  user-select: none;\n  border: none;\n  outline: none;\n  padding: 0;\n  overflow: visible;\n  transition: box-shadow 0.25s ease, transform 0.15s ease;\n}\n.cc-fab:hover {\n  box-shadow:\n    0 5px 22px rgba(217,119,87,0.45),\n    0 1px 4px rgba(0,0,0,0.1);\n  transform: translateY(-1px);\n}\n.cc-fab:active { transform: scale(0.94); }\n.cc-fab.cc-streaming {\n  animation: cc-pulse 2s ease-in-out infinite;\n}\n.cc-fab.cc-streaming:hover { animation: none; }\n@keyframes cc-pulse {\n  0%, 100% { box-shadow: 0 3px 14px rgba(217,119,87,0.35), 0 1px 3px rgba(0,0,0,0.1); }\n  50% { box-shadow: 0 3px 22px rgba(217,119,87,0.65), 0 1px 3px rgba(0,0,0,0.1), 0 0 12px rgba(217,119,87,0.25); }\n}\n.cc-fab svg {\n  width: 20px; height: 20px;\n  fill: none; stroke: currentColor; stroke-width: 1.8;\n}\n\n/* Hover ring */\n.cc-fab::after {\n  content: '';\n  position: absolute;\n  inset: -5px;\n  border-radius: 50%;\n  border: 1.5px solid var(--cc-ember);\n  opacity: 0;\n  pointer-events: none;\n  transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);\n  transform: scale(0.9);\n}\n.cc-fab:hover::after {\n  opacity: 0.4;\n  transform: scale(1.15);\n}\n\n/* Status dot */\n.cc-status-dot {\n  position: absolute;\n  top: -1px;\n  right: -1px;\n  width: 9px;\n  height: 9px;\n  border-radius: 50%;\n  background: var(--cc-text-ghost);\n  border: 2px solid #fff;\n  transition: background 0.3s ease;\n  z-index: 1;\n}\n.cc-status-dot.cc-online { background: var(--cc-success); }\n.cc-status-dot.cc-offline { background: var(--cc-error); }\n\n/* Update dot */\n.cc-update-dot {\n  position: absolute;\n  top: -1px;\n  left: -1px;\n  width: 9px;\n  height: 9px;\n  border-radius: 50%;\n  background: var(--cc-error);\n  border: 2px solid #fff;\n  z-index: 2;\n  display: none;\n  animation: cc-update-ping 2s ease-in-out 3;\n}\n.cc-update-dot.cc-update-available { display: block; }\n@keyframes cc-update-ping {\n  0%, 100% { transform: scale(1); }\n  50% { transform: scale(1.3); }\n}\n\n/* ────────────────── UPDATE BANNER ────────────────── */\n.cc-update-banner {\n  display: none;\n  align-items: center;\n  gap: 6px;\n  padding: 6px 12px;\n  background: linear-gradient(135deg, rgba(217,119,87,0.1), rgba(217,119,87,0.05));\n  border-bottom: 1px solid var(--cc-surface-3);\n  font-size: 11px;\n  color: var(--cc-text-secondary);\n  flex-shrink: 0;\n}\n.cc-update-icon {\n  width: 18px;\n  height: 18px;\n  border-radius: 50%;\n  background: var(--cc-ember);\n  color: #fff;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 11px;\n  font-weight: 700;\n  flex-shrink: 0;\n}\n.cc-update-text {\n  flex: 1;\n  min-width: 0;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.cc-update-text strong { color: var(--cc-ember); font-weight: 600; }\n.cc-update-link {\n  flex-shrink: 0;\n  color: var(--cc-ember);\n  text-decoration: none;\n  font-weight: 500;\n  font-size: 11px;\n  transition: opacity 0.12s;\n}\n.cc-update-link:hover { opacity: 0.8; text-decoration: underline; }\n.cc-update-now-btn {\n  flex-shrink: 0;\n  background: var(--cc-ember);\n  color: #fff;\n  border: none;\n  border-radius: 4px;\n  padding: 2px 10px;\n  font-family: var(--cc-font);\n  font-size: 11px;\n  font-weight: 500;\n  cursor: pointer;\n  transition: opacity 0.12s;\n}\n.cc-update-now-btn:hover:not(:disabled) { opacity: 0.85; }\n.cc-update-now-btn:disabled { opacity: 0.5; cursor: not-allowed; }\n.cc-update-dismiss {\n  flex-shrink: 0;\n  background: none;\n  border: none;\n  color: var(--cc-text-muted);\n  font-size: 14px;\n  cursor: pointer;\n  padding: 0 2px;\n  line-height: 1;\n}\n.cc-update-dismiss:hover { color: var(--cc-text-primary); }\n\n/* ────────────────── PANEL ────────────────── */\n.cc-panel {\n  position: fixed;\n  right: 24px;\n  bottom: 82px;\n  width: 390px;\n  height: 530px;\n  min-width: 320px;\n  min-height: 340px;\n  max-width: 600px;\n  max-height: 80vh;\n  background: var(--cc-surface-1);\n  border: 1px solid var(--cc-surface-3);\n  border-radius: var(--cc-r);\n  box-shadow:\n    0 12px 40px rgba(0,0,0,0.12),\n    0 2px 6px rgba(0,0,0,0.06);\n  z-index: 99999;\n  display: none;\n  flex-direction: column;\n  font-family: var(--cc-font);\n  font-size: 13px;\n  color: var(--cc-text-primary);\n  overflow: hidden;\n  contain: layout style paint;\n}\n.cc-panel.cc-visible {\n  display: flex;\n  animation: cc-emerge 0.22s cubic-bezier(0.16, 1, 0.3, 1);\n}\n@keyframes cc-emerge {\n  from { opacity: 0; transform: translateY(8px) scale(0.97); }\n  to   { opacity: 1; transform: none; }\n}\n\n/* ────────────────── HEADER ────────────────── */\n.cc-header {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 10px 14px;\n  border-bottom: 1px solid var(--cc-surface-3);\n  cursor: grab;\n  user-select: none;\n  flex-shrink: 0;\n  background: var(--cc-surface-1);\n}\n.cc-header:active { cursor: grabbing; }\n\n.cc-title {\n  font-weight: 600;\n  font-size: 13px;\n  display: flex;\n  align-items: center;\n  gap: 7px;\n  color: var(--cc-text-primary);\n  letter-spacing: -0.01em;\n}\n.cc-title svg { width: 14px; height: 14px; color: var(--cc-ember); }\n\n.cc-header-actions { display: flex; align-items: center; gap: 2px; }\n.cc-header-btn {\n  background: none;\n  border: none;\n  width: 26px;\n  height: 26px;\n  border-radius: 6px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  cursor: pointer;\n  color: var(--cc-text-muted);\n  padding: 0;\n  transition: background 0.12s, color 0.12s;\n}\n.cc-header-btn svg { width: 13px; height: 13px; }\n.cc-header-btn:hover {\n  background: var(--cc-surface-3);\n  color: var(--cc-text-secondary);\n}\n\n/* Context bar hidden — selection now shown in input area */\n\n/* ────────────────── SESSION LIST ────────────────── */\n.cc-session-list {\n  display: none;\n  flex-direction: column;\n  max-height: 200px;\n  overflow-y: auto;\n  border-bottom: 1px solid var(--cc-surface-3);\n  background: var(--cc-surface-0);\n}\n.cc-session-list.cc-sl-visible { display: flex; }\n.cc-sl-empty {\n  padding: 12px;\n  text-align: center;\n  color: var(--cc-text-ghost);\n  font-size: 12px;\n}\n.cc-sl-item {\n  display: flex;\n  align-items: center;\n  padding: 7px 12px;\n  gap: 8px;\n  cursor: pointer;\n  transition: background 0.1s;\n  border-bottom: 1px solid var(--cc-surface-2);\n}\n.cc-sl-item:last-child { border-bottom: none; }\n.cc-sl-item:hover { background: var(--cc-surface-2); }\n.cc-sl-item.cc-sl-active {\n  background: var(--cc-ember-dim);\n  border-left: 3px solid var(--cc-ember);\n  padding-left: 9px;\n}\n.cc-sl-info { flex: 1; min-width: 0; }\n.cc-sl-title {\n  font-size: 12px;\n  font-weight: 500;\n  color: var(--cc-text-primary);\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.cc-sl-time {\n  font-size: 10px;\n  color: var(--cc-text-ghost);\n  margin-top: 1px;\n}\n.cc-sl-del {\n  flex-shrink: 0;\n  background: none;\n  border: none;\n  color: var(--cc-text-ghost);\n  font-size: 16px;\n  cursor: pointer;\n  padding: 0 4px;\n  line-height: 1;\n  opacity: 0;\n  transition: opacity 0.1s, color 0.1s;\n}\n.cc-sl-item:hover .cc-sl-del { opacity: 1; }\n.cc-sl-del:hover { color: var(--cc-error); }\n\n/* Session list tabs */\n.cc-sl-tabs {\n  display: flex;\n  border-bottom: 1px solid var(--cc-surface-3);\n  flex-shrink: 0;\n}\n.cc-sl-tab {\n  flex: 1;\n  text-align: center;\n  padding: 7px 0;\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  cursor: pointer;\n  transition: color 0.12s, border-color 0.12s;\n  border-bottom: 2px solid transparent;\n}\n.cc-sl-tab:hover { color: var(--cc-text-primary); }\n.cc-sl-tab-active {\n  color: var(--cc-ember);\n  border-bottom-color: var(--cc-ember);\n  font-weight: 500;\n}\n.cc-sl-list-wrap {\n  overflow-y: auto;\n  max-height: 170px;\n}\n\n/* Import items */\n.cc-sl-lastq {\n  font-size: 10px;\n  color: var(--cc-ember);\n  margin-top: 1px;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  opacity: 0.8;\n}\n.cc-sl-meta {\n  font-size: 10px;\n  color: var(--cc-text-ghost);\n  margin-top: 1px;\n}\n.cc-sl-summary {\n  font-size: 10px;\n  color: var(--cc-text-muted);\n  margin-top: 2px;\n  display: -webkit-box;\n  -webkit-line-clamp: 2;\n  -webkit-box-orient: vertical;\n  overflow: hidden;\n  line-height: 1.3;\n}\n.cc-sl-import-btn {\n  flex-shrink: 0;\n  background: var(--cc-ember);\n  color: #fff;\n  border: none;\n  border-radius: 4px;\n  padding: 3px 10px;\n  font-size: 11px;\n  cursor: pointer;\n  font-family: var(--cc-font);\n  transition: opacity 0.12s;\n}\n.cc-sl-import-btn:hover { opacity: 0.85; }\n.cc-engine-badge {\n  display: inline-block;\n  font-size: 9px;\n  font-weight: 600;\n  color: #fff;\n  padding: 1px 5px;\n  border-radius: 3px;\n  margin-bottom: 2px;\n  letter-spacing: 0.3px;\n}\n\n/* Import notice */\n.cc-import-notice {\n  text-align: center;\n  padding: 16px;\n  color: var(--cc-text-secondary);\n  font-size: 12px;\n  line-height: 1.6;\n  background: var(--cc-ember-dim);\n  border-radius: var(--cc-r-sm);\n  margin: 8px;\n}\n.cc-import-notice strong {\n  color: var(--cc-ember);\n  font-size: 13px;\n}\n.cc-text-muted { color: var(--cc-text-ghost); }\n\n/* ────────────────── MESSAGES ────────────────── */\n.cc-messages-wrap {\n  flex: 1;\n  position: relative;\n  overflow: hidden;\n  min-height: 0;\n}\n.cc-messages {\n  position: absolute;\n  inset: 0;\n  overflow-y: auto;\n  padding: 14px;\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n  user-select: text;\n}\n.cc-messages::-webkit-scrollbar { width: 4px; }\n.cc-messages::-webkit-scrollbar-track { background: transparent; }\n.cc-messages::-webkit-scrollbar-thumb {\n  background: var(--cc-surface-4);\n  border-radius: 2px;\n}\n\n/* Welcome */\n.cc-welcome {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  height: 100%;\n  gap: 10px;\n  color: var(--cc-text-muted);\n  text-align: center;\n  padding: 24px;\n}\n.cc-welcome-title {\n  font-size: 15px;\n  font-weight: 600;\n  color: var(--cc-text-primary);\n  letter-spacing: -0.02em;\n}\n.cc-welcome-hint {\n  font-size: 12px;\n  line-height: 1.7;\n  color: var(--cc-text-muted);\n  max-width: 260px;\n}\n.cc-welcome-shortcuts {\n  display: flex;\n  gap: 14px;\n  margin-top: 4px;\n  font-size: 11px;\n  color: var(--cc-text-ghost);\n}\n.cc-welcome-shortcuts kbd {\n  background: var(--cc-surface-3);\n  border: 1px solid var(--cc-surface-4);\n  border-radius: 4px;\n  padding: 1px 5px;\n  font-family: var(--cc-mono);\n  font-size: 10px;\n  color: var(--cc-text-muted);\n}\n\n/* ────────────────── BUBBLES ────────────────── */\n.cc-msg {\n  max-width: 88%;\n  animation: cc-msg-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);\n}\n@keyframes cc-msg-in {\n  from { opacity: 0; transform: translateY(4px); }\n  to   { opacity: 1; transform: none; }\n}\n\n/* No separate label — bubbles are self-evident by alignment */\n\n.cc-msg-user { align-self: flex-end; }\n.cc-msg-user .cc-msg-body {\n  background: var(--cc-ember);\n  color: #fff;\n  border-radius: var(--cc-r-sm) var(--cc-r-sm) 3px var(--cc-r-sm);\n  padding: 9px 13px;\n  line-height: 1.5;\n  font-size: 13px;\n  white-space: pre-wrap;\n  word-break: break-word;\n}\n\n.cc-msg-assistant { align-self: flex-start; }\n.cc-msg-assistant .cc-msg-body {\n  background: var(--cc-surface-2);\n  color: var(--cc-text-primary);\n  border-radius: var(--cc-r-sm) var(--cc-r-sm) var(--cc-r-sm) 3px;\n  padding: 10px 13px;\n  line-height: 1.6;\n  font-size: 13px;\n  word-break: break-word;\n  border: 1px solid var(--cc-surface-3);\n}\n\n/* ────────────────── ACTIVITY STEPS ────────────────── */\n.cc-activity { margin-bottom: 6px; }\n.cc-step {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 3px 0;\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  line-height: 1.3;\n}\n.cc-step-icon {\n  flex-shrink: 0;\n  width: 15px;\n  height: 15px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 10px;\n}\n.cc-step-icon.cc-spinning {\n  animation: cc-spin 1s linear infinite;\n}\n@keyframes cc-spin { to { transform: rotate(360deg); } }\n.cc-step-text { flex: 1; min-width: 0; }\n.cc-step-detail {\n  font-size: 10px;\n  color: var(--cc-text-ghost);\n  margin-top: 1px;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  line-height: 1.3;\n}\n\n/* Streaming cursor */\n.cc-cursor {\n  display: inline-block;\n  width: 1.5px;\n  height: 14px;\n  background: var(--cc-ember);\n  margin-left: 1px;\n  vertical-align: text-bottom;\n  animation: cc-blink 0.8s step-end infinite;\n}\n@keyframes cc-blink { 50% { opacity: 0; } }\n\n/* ────────────────── THOUGHT (intermediate text) ────────────────── */\n.cc-thought {\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  padding: 2px 0 2px 22px;\n  line-height: 1.4;\n  word-break: break-word;\n}\n\n/* ────────────────── COLLAPSED ACTIVITY SUMMARY ────────────────── */\n.cc-activity-summary {\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  padding: 4px 8px;\n  cursor: pointer;\n  border-radius: 4px;\n  display: flex;\n  align-items: center;\n  gap: 5px;\n  transition: background 0.12s;\n}\n.cc-activity-summary:hover {\n  background: var(--cc-surface-2);\n  color: var(--cc-text-secondary);\n}\n.cc-summary-toggle {\n  font-size: 9px;\n  color: var(--cc-text-ghost);\n  width: 12px;\n  text-align: center;\n}\n.cc-activity-details {\n  padding: 4px 0 4px 6px;\n  border-left: 2px solid var(--cc-surface-3);\n  margin-left: 5px;\n  margin-top: 4px;\n}\n\n/* ────────────────── INPUT ────────────────── */\n.cc-input-area {\n  flex-shrink: 0;\n  border-top: 1px solid var(--cc-surface-3);\n  padding: 10px 14px;\n  background: var(--cc-surface-1);\n}\n\n/* Selection quote bar above input */\n.cc-selection-bar {\n  display: none;\n  align-items: center;\n  gap: 6px;\n  padding: 5px 10px;\n  margin-bottom: 8px;\n  background: var(--cc-ember-dim);\n  border-left: 3px solid var(--cc-ember);\n  border-radius: 0 6px 6px 0;\n  font-size: 11px;\n  color: var(--cc-text-secondary);\n  line-height: 1.4;\n}\n.cc-sel-quote {\n  color: var(--cc-ember);\n  flex-shrink: 0;\n  display: flex;\n  align-items: center;\n}\n.cc-sel-quote svg { width: 13px; height: 13px; }\n.cc-sel-text {\n  flex: 1;\n  min-width: 0;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.cc-sel-clear {\n  flex-shrink: 0;\n  background: none;\n  border: none;\n  color: var(--cc-text-muted);\n  font-size: 14px;\n  cursor: pointer;\n  padding: 0 2px;\n  line-height: 1;\n}\n.cc-sel-clear:hover { color: var(--cc-text-primary); }\n.cc-input-wrapper {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  background: var(--cc-surface-0);\n  border: 1px solid var(--cc-surface-3);\n  border-radius: var(--cc-r-sm);\n  padding: 6px 10px;\n  min-height: 36px;\n  transition: border-color 0.15s, box-shadow 0.15s;\n}\n.cc-input-wrapper:focus-within {\n  border-color: var(--cc-ember);\n  box-shadow: 0 0 0 2px var(--cc-ember-dim);\n}\n.cc-input {\n  flex: 1;\n  border: none;\n  background: transparent;\n  resize: none;\n  font-family: var(--cc-font);\n  font-size: 13px;\n  outline: none;\n  color: var(--cc-text-primary);\n  line-height: 20px;\n  max-height: 120px;\n  min-height: 20px;\n  height: 20px;\n  padding: 0;\n  margin: 0;\n  vertical-align: middle;\n}\n.cc-input::placeholder { color: var(--cc-text-ghost); }\n\n.cc-send-btn {\n  flex-shrink: 0;\n  width: 30px;\n  height: 30px;\n  border-radius: var(--cc-r-sm);\n  border: none;\n  background: var(--cc-ember);\n  color: #fff;\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  padding: 0;\n  transition: background 0.12s, opacity 0.1s;\n}\n.cc-send-btn svg {\n  width: 14px; height: 14px;\n  fill: none; stroke: currentColor; stroke-width: 2;\n}\n.cc-send-btn:hover:not(:disabled) { background: var(--cc-ember-hover); }\n.cc-send-btn:active:not(:disabled) { opacity: 0.8; }\n.cc-send-btn:disabled { opacity: 0.3; cursor: not-allowed; }\n\n.cc-input-footer {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  margin-top: 6px;\n  padding: 0 2px;\n}\n.cc-checkbox {\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  display: flex;\n  align-items: center;\n  gap: 4px;\n  cursor: pointer;\n  user-select: none;\n}\n.cc-checkbox input[type=\"checkbox\"] {\n  width: 13px; height: 13px;\n  accent-color: var(--cc-ember);\n  margin: 0;\n}\n.cc-engine-switch {\n  background: none;\n  border: 1px solid var(--cc-surface-4);\n  border-radius: 4px;\n  padding: 1px 7px;\n  font-size: 10px;\n  font-family: var(--cc-font);\n  color: var(--cc-text-secondary);\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n  transition: border-color 0.15s, background 0.15s;\n}\n.cc-engine-switch:hover { border-color: var(--cc-text-muted); background: var(--cc-surface-2); }\n.cc-engine-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }\n.cc-engine-arrow { font-size: 8px; color: var(--cc-text-ghost); }\n.cc-input-hint {\n  font-size: 10px;\n  color: var(--cc-text-ghost);\n  display: flex;\n  align-items: center;\n  gap: 3px;\n}\n.cc-input-hint kbd {\n  background: var(--cc-surface-3);\n  border: 1px solid var(--cc-surface-4);\n  border-radius: 3px;\n  padding: 0 4px;\n  font-family: var(--cc-mono);\n  font-size: 9px;\n  color: var(--cc-text-muted);\n}\n\n/* ────────────────── STOP BUTTON ────────────────── */\n.cc-stop-btn {\n  display: none;\n  align-items: center;\n  justify-content: center;\n  gap: 4px;\n  background: transparent;\n  border: 1px solid var(--cc-surface-4);\n  border-radius: 6px;\n  padding: 3px 10px;\n  font-family: var(--cc-font);\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  cursor: pointer;\n  transition: background 0.12s, color 0.12s, border-color 0.12s;\n  margin: 0 auto 6px;\n}\n.cc-stop-btn:hover {\n  background: var(--cc-error-bg);\n  color: var(--cc-error);\n  border-color: var(--cc-error);\n}\n.cc-stop-btn.cc-active { display: inline-flex; }\n\n/* ────────────────── MESSAGE ACTIONS ────────────────── */\n.cc-msg-actions {\n  display: flex;\n  gap: 6px;\n  padding: 4px 0 0;\n}\n.cc-action-btn {\n  display: inline-flex;\n  align-items: center;\n  gap: 3px;\n  background: none;\n  border: 1px solid var(--cc-surface-3);\n  border-radius: 4px;\n  padding: 2px 8px;\n  font-family: var(--cc-font);\n  font-size: 10px;\n  color: var(--cc-text-muted);\n  cursor: pointer;\n  transition: background 0.12s, color 0.12s, border-color 0.12s;\n}\n.cc-action-btn:hover {\n  background: var(--cc-surface-2);\n  color: var(--cc-text-secondary);\n  border-color: var(--cc-surface-4);\n}\n.cc-action-btn svg { width: 11px; height: 11px; }\n\n/* ────────────────── QUICK ACTIONS ────────────────── */\n.cc-quick-actions {\n  display: flex;\n  gap: 6px;\n  padding-bottom: 8px;\n  flex-wrap: wrap;\n}\n.cc-quick-btn {\n  background: var(--cc-surface-2);\n  border: 1px solid var(--cc-surface-3);\n  border-radius: 12px;\n  padding: 3px 10px;\n  font-family: var(--cc-font);\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  cursor: pointer;\n  transition: background 0.12s, color 0.12s, border-color 0.12s;\n  white-space: nowrap;\n}\n.cc-quick-btn:hover {\n  background: var(--cc-ember-dim);\n  color: var(--cc-ember);\n  border-color: var(--cc-ember);\n}\n\n/* ────────────────── LINKED DOCS ────────────────── */\n.cc-linked-docs { padding-bottom: 6px; }\n.cc-link-header {\n  display: flex; align-items: center; gap: 4px;\n  font-size: 10px; color: var(--cc-text-ghost); margin-bottom: 3px;\n}\n.cc-link-header svg { width: 10px; height: 10px; }\n.cc-link-item {\n  display: flex; align-items: center; gap: 4px;\n  padding: 3px 8px; background: var(--cc-ember-dim);\n  border-radius: 4px; margin-bottom: 2px; font-size: 11px;\n  border-left: 2px solid var(--cc-ember);\n}\n.cc-link-title {\n  flex: 1; min-width: 0;\n  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\n  color: var(--cc-text-secondary);\n}\n.cc-link-rm {\n  flex-shrink: 0; background: none; border: none;\n  color: var(--cc-text-ghost); font-size: 14px;\n  cursor: pointer; padding: 0 2px; line-height: 1;\n}\n.cc-link-rm:hover { color: var(--cc-error); }\n\n/* Toggle button */\n.cc-link-toggle {\n  display: inline-flex;\n  align-items: center;\n  gap: 4px;\n  background: none;\n  border: 1px dashed var(--cc-surface-4);\n  border-radius: 6px;\n  padding: 3px 10px;\n  font-family: var(--cc-font);\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  cursor: pointer;\n  transition: background 0.12s, color 0.12s, border-color 0.12s;\n}\n.cc-link-toggle:hover {\n  background: var(--cc-ember-dim);\n  color: var(--cc-ember);\n  border-color: var(--cc-ember);\n}\n.cc-link-toggle svg { width: 11px; height: 11px; }\n.cc-link-toggle-arrow {\n  font-size: 8px;\n  margin-left: 2px;\n}\n\n/* Search input */\n.cc-link-search-wrap { position: relative; }\n.cc-link-search {\n  width: 100%; box-sizing: border-box;\n  border: 1px solid var(--cc-surface-3);\n  border-radius: 6px;\n  padding: 4px 8px;\n  font-family: var(--cc-font);\n  font-size: 11px;\n  color: var(--cc-text-primary);\n  background: var(--cc-surface-0);\n  outline: none;\n  transition: border-color 0.12s;\n}\n.cc-link-search:focus { border-color: var(--cc-ember); }\n.cc-link-search::placeholder { color: var(--cc-text-ghost); }\n.cc-link-results {\n  max-height: 130px;\n  overflow-y: auto;\n  border: 1px solid var(--cc-surface-3);\n  border-top: none;\n  border-radius: 0 0 6px 6px;\n  background: var(--cc-surface-1);\n  display: none;\n}\n.cc-link-search:focus ~ .cc-link-results,\n.cc-link-results:hover { display: block; }\n.cc-link-results:empty { display: none; }\n.cc-link-loading {\n  padding: 8px; text-align: center;\n  font-size: 11px; color: var(--cc-text-ghost);\n}\n.cc-link-result {\n  display: flex; align-items: center; justify-content: space-between;\n  padding: 5px 8px; cursor: pointer;\n  transition: background 0.1s;\n}\n.cc-link-result:hover { background: var(--cc-surface-2); }\n.cc-link-result-name {\n  font-size: 11px; color: var(--cc-text-primary);\n  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\n  flex: 1; min-width: 0;\n}\n.cc-link-result-meta {\n  font-size: 10px; color: var(--cc-text-ghost);\n  flex-shrink: 0; margin-left: 8px;\n}\n\n/* ────────────────── MARKDOWN ────────────────── */\n.cc-md { font-size: 13px; line-height: 1.65; }\n.cc-md p { margin: 0 0 8px; }\n.cc-md p:last-child { margin-bottom: 0; }\n.cc-md h1,.cc-md h2,.cc-md h3,.cc-md h4,.cc-md h5,.cc-md h6 {\n  font-weight: 600; margin: 12px 0 4px; line-height: 1.3;\n  color: var(--cc-text-primary);\n}\n.cc-md h1 { font-size: 16px; }\n.cc-md h2 { font-size: 15px; }\n.cc-md h3 { font-size: 14px; }\n.cc-md h4,.cc-md h5,.cc-md h6 { font-size: 13px; }\n.cc-md h1:first-child,.cc-md h2:first-child,.cc-md h3:first-child { margin-top: 0; }\n.cc-md strong { font-weight: 600; color: var(--cc-text-primary); }\n.cc-md em { font-style: italic; }\n.cc-md code {\n  font-family: var(--cc-mono);\n  font-size: 11.5px;\n  background: var(--cc-surface-3);\n  padding: 1.5px 5px;\n  border-radius: 4px;\n  color: var(--cc-text-primary);\n}\n.cc-md pre {\n  background: #1e1e2e;\n  border: 1px solid var(--cc-surface-3);\n  color: #cdd6f4;\n  padding: 10px 12px;\n  border-radius: var(--cc-r-sm);\n  overflow-x: auto;\n  margin: 8px 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n.cc-md pre code {\n  background: none;\n  padding: 0;\n  font-size: inherit;\n  color: inherit;\n  border-radius: 0;\n}\n.cc-md ul,.cc-md ol { padding-left: 18px; margin: 4px 0; }\n.cc-md li { margin: 2px 0; line-height: 1.5; }\n.cc-md blockquote {\n  border-left: 2px solid var(--cc-ember);\n  padding: 3px 10px;\n  margin: 6px 0;\n  color: var(--cc-text-secondary);\n  background: var(--cc-ember-dim);\n  border-radius: 0 4px 4px 0;\n}\n.cc-md a { color: var(--cc-ember); text-decoration: none; }\n.cc-md a:hover { text-decoration: underline; }\n.cc-md hr { border: none; border-top: 1px solid var(--cc-surface-3); margin: 10px 0; }\n.cc-md table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 12px; }\n.cc-md th,.cc-md td {\n  border: 1px solid var(--cc-surface-3);\n  padding: 5px 8px;\n  text-align: left;\n}\n.cc-md th { background: var(--cc-surface-2); font-weight: 600; }\n\n/* ────────────────── ERROR ────────────────── */\n.cc-error {\n  color: var(--cc-error);\n  padding: 8px 10px;\n  background: var(--cc-error-bg);\n  border-radius: var(--cc-r-sm);\n  line-height: 1.5;\n  font-size: 12px;\n  border: 1px solid rgba(224, 92, 92, 0.15);\n}\n.cc-retry-btn {\n  display: inline-block;\n  margin-top: 8px;\n  padding: 4px 14px;\n  border: 1px solid var(--cc-error);\n  border-radius: 6px;\n  background: transparent;\n  color: var(--cc-error);\n  font-family: var(--cc-font);\n  font-size: 12px;\n  cursor: pointer;\n  transition: background 0.12s, color 0.12s;\n}\n.cc-retry-btn:hover {\n  background: var(--cc-error);\n  color: #fff;\n}\n.cc-error code {\n  background: rgba(224,92,92,0.1);\n  padding: 1px 4px;\n  border-radius: 3px;\n  font-family: var(--cc-mono);\n  font-size: 11px;\n}\n\n/* ────────────────── STOPPED ────────────────── */\n.cc-stopped {\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  padding: 4px 0;\n  margin-top: 4px;\n}\n\n/* ────────────────── RESIZE HANDLE ────────────────── */\n.cc-resize-handle {\n  position: absolute;\n  right: 0;\n  bottom: 0;\n  width: 16px;\n  height: 16px;\n  cursor: nwse-resize;\n  z-index: 1;\n}\n.cc-resize-handle::after {\n  content: '';\n  position: absolute;\n  right: 4px;\n  bottom: 4px;\n  width: 6px;\n  height: 6px;\n  border-right: 2px solid var(--cc-surface-4);\n  border-bottom: 2px solid var(--cc-surface-4);\n  opacity: 0.4;\n  transition: opacity 0.15s;\n}\n.cc-panel:hover .cc-resize-handle::after {\n  opacity: 0.7;\n}\n\n/* ────────────────── DARK MODE ────────────────── */\n@media (prefers-color-scheme: dark) {\n  :root {\n    --cc-surface-0: #1a1a1c;\n    --cc-surface-1: #222224;\n    --cc-surface-2: #2a2a2d;\n    --cc-surface-3: #333337;\n    --cc-surface-4: #3e3e43;\n    --cc-text-primary: #ececef;\n    --cc-text-secondary: #a0a0a8;\n    --cc-text-muted: #6c6c75;\n    --cc-text-ghost: #4a4a52;\n    --cc-ember-glow: rgba(217, 119, 87, 0.18);\n    --cc-ember-dim: rgba(217, 119, 87, 0.1);\n  }\n  .cc-status-dot { border-color: var(--cc-surface-0); }\n  .cc-update-dot { border-color: var(--cc-surface-0); }\n  .cc-msg-user .cc-msg-body { background: var(--cc-ember); color: #fff; }\n  .cc-md pre { background: #0d0d14; border-color: var(--cc-surface-3); color: #cdd6f4; }\n}\n";document.head.appendChild(s)})();
+(function(){var s=document.createElement("style");s.textContent="/* Claude Code for WPS 365 */\n\n@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');\n\n:root {\n  /* Surface palette — clean light base */\n  --cc-surface-0: #f5f5f5;\n  --cc-surface-1: #ffffff;\n  --cc-surface-2: #f9f9fa;\n  --cc-surface-3: #e8e8eb;\n  --cc-surface-4: #d5d5da;\n\n  /* Text hierarchy */\n  --cc-text-primary: #1a1a1e;\n  --cc-text-secondary: #5a5a63;\n  --cc-text-muted: #8a8a95;\n  --cc-text-ghost: #b0b0ba;\n\n  /* Claude orange accent */\n  --cc-ember: #D97757;\n  --cc-ember-hover: #c4684a;\n  --cc-ember-glow: rgba(217, 119, 87, 0.2);\n  --cc-ember-dim: rgba(217, 119, 87, 0.08);\n\n  /* Semantic */\n  --cc-success: #5cb87a;\n  --cc-error: #e05c5c;\n  --cc-error-bg: rgba(224, 92, 92, 0.1);\n\n  /* Radii & type */\n  --cc-r: 12px;\n  --cc-r-sm: 8px;\n  --cc-font: 'DM Sans', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;\n  --cc-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;\n}\n\n/* ────────────────── FAB ────────────────── */\n.cc-fab {\n  position: fixed;\n  right: 24px;\n  bottom: 24px;\n  width: 46px;\n  height: 46px;\n  border-radius: 50%;\n  background: var(--cc-ember);\n  color: #fff;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  cursor: pointer;\n  box-shadow:\n    0 3px 14px rgba(217,119,87,0.35),\n    0 1px 3px rgba(0,0,0,0.1);\n  z-index: 99999;\n  user-select: none;\n  border: none;\n  outline: none;\n  padding: 0;\n  overflow: visible;\n  transition: box-shadow 0.25s ease, transform 0.15s ease;\n}\n.cc-fab:hover {\n  box-shadow:\n    0 5px 22px rgba(217,119,87,0.45),\n    0 1px 4px rgba(0,0,0,0.1);\n  transform: translateY(-1px);\n}\n.cc-fab:active { transform: scale(0.94); }\n.cc-fab.cc-streaming {\n  animation: cc-pulse 2s ease-in-out infinite;\n}\n.cc-fab.cc-streaming:hover { animation: none; }\n@keyframes cc-pulse {\n  0%, 100% { box-shadow: 0 3px 14px rgba(217,119,87,0.35), 0 1px 3px rgba(0,0,0,0.1); }\n  50% { box-shadow: 0 3px 22px rgba(217,119,87,0.65), 0 1px 3px rgba(0,0,0,0.1), 0 0 12px rgba(217,119,87,0.25); }\n}\n.cc-fab svg {\n  width: 20px; height: 20px;\n  fill: none; stroke: currentColor; stroke-width: 1.8;\n}\n\n/* Hover ring */\n.cc-fab::after {\n  content: '';\n  position: absolute;\n  inset: -5px;\n  border-radius: 50%;\n  border: 1.5px solid var(--cc-ember);\n  opacity: 0;\n  pointer-events: none;\n  transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);\n  transform: scale(0.9);\n}\n.cc-fab:hover::after {\n  opacity: 0.4;\n  transform: scale(1.15);\n}\n\n/* Status dot */\n.cc-status-dot {\n  position: absolute;\n  top: -1px;\n  right: -1px;\n  width: 9px;\n  height: 9px;\n  border-radius: 50%;\n  background: var(--cc-text-ghost);\n  border: 2px solid #fff;\n  transition: background 0.3s ease;\n  z-index: 1;\n}\n.cc-status-dot.cc-online { background: var(--cc-success); }\n.cc-status-dot.cc-offline { background: var(--cc-error); }\n\n/* Update dot */\n.cc-update-dot {\n  position: absolute;\n  top: -1px;\n  left: -1px;\n  width: 9px;\n  height: 9px;\n  border-radius: 50%;\n  background: var(--cc-error);\n  border: 2px solid #fff;\n  z-index: 2;\n  display: none;\n  animation: cc-update-ping 2s ease-in-out 3;\n}\n.cc-update-dot.cc-update-available { display: block; }\n@keyframes cc-update-ping {\n  0%, 100% { transform: scale(1); }\n  50% { transform: scale(1.3); }\n}\n\n/* ────────────────── UPDATE BANNER ────────────────── */\n.cc-update-banner {\n  display: none;\n  align-items: center;\n  gap: 6px;\n  padding: 6px 12px;\n  background: linear-gradient(135deg, rgba(217,119,87,0.1), rgba(217,119,87,0.05));\n  border-bottom: 1px solid var(--cc-surface-3);\n  font-size: 11px;\n  color: var(--cc-text-secondary);\n  flex-shrink: 0;\n}\n.cc-update-icon {\n  width: 18px;\n  height: 18px;\n  border-radius: 50%;\n  background: var(--cc-ember);\n  color: #fff;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 11px;\n  font-weight: 700;\n  flex-shrink: 0;\n}\n.cc-update-text {\n  flex: 1;\n  min-width: 0;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.cc-update-text strong { color: var(--cc-ember); font-weight: 600; }\n.cc-update-link {\n  flex-shrink: 0;\n  color: var(--cc-ember);\n  text-decoration: none;\n  font-weight: 500;\n  font-size: 11px;\n  transition: opacity 0.12s;\n}\n.cc-update-link:hover { opacity: 0.8; text-decoration: underline; }\n.cc-update-now-btn {\n  flex-shrink: 0;\n  background: var(--cc-ember);\n  color: #fff;\n  border: none;\n  border-radius: 4px;\n  padding: 2px 10px;\n  font-family: var(--cc-font);\n  font-size: 11px;\n  font-weight: 500;\n  cursor: pointer;\n  transition: opacity 0.12s;\n}\n.cc-update-now-btn:hover:not(:disabled) { opacity: 0.85; }\n.cc-update-now-btn:disabled { opacity: 0.5; cursor: not-allowed; }\n.cc-update-dismiss {\n  flex-shrink: 0;\n  background: none;\n  border: none;\n  color: var(--cc-text-muted);\n  font-size: 14px;\n  cursor: pointer;\n  padding: 0 2px;\n  line-height: 1;\n}\n.cc-update-dismiss:hover { color: var(--cc-text-primary); }\n\n/* ────────────────── PANEL ────────────────── */\n.cc-panel {\n  position: fixed;\n  right: 24px;\n  bottom: 82px;\n  width: 390px;\n  height: 530px;\n  min-width: 320px;\n  min-height: 340px;\n  max-width: 600px;\n  max-height: 80vh;\n  background: var(--cc-surface-1);\n  border: 1px solid var(--cc-surface-3);\n  border-radius: var(--cc-r);\n  box-shadow:\n    0 12px 40px rgba(0,0,0,0.12),\n    0 2px 6px rgba(0,0,0,0.06);\n  z-index: 99999;\n  display: none;\n  flex-direction: column;\n  font-family: var(--cc-font);\n  font-size: 13px;\n  color: var(--cc-text-primary);\n  overflow: hidden;\n  contain: layout style paint;\n}\n.cc-panel.cc-visible {\n  display: flex;\n  animation: cc-emerge 0.22s cubic-bezier(0.16, 1, 0.3, 1);\n}\n@keyframes cc-emerge {\n  from { opacity: 0; transform: translateY(8px) scale(0.97); }\n  to   { opacity: 1; transform: none; }\n}\n\n/* ────────────────── HEADER ────────────────── */\n.cc-header {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 10px 14px;\n  border-bottom: 1px solid var(--cc-surface-3);\n  cursor: grab;\n  user-select: none;\n  flex-shrink: 0;\n  background: var(--cc-surface-1);\n}\n.cc-header:active { cursor: grabbing; }\n\n.cc-title {\n  font-weight: 600;\n  font-size: 13px;\n  display: flex;\n  align-items: center;\n  gap: 7px;\n  min-width: 0;\n  color: var(--cc-text-primary);\n  letter-spacing: -0.01em;\n}\n.cc-title svg { width: 14px; height: 14px; color: var(--cc-ember); flex-shrink: 0; }\n.cc-title-dir {\n  min-width: 0; max-width: 160px;\n  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\n  font-family: var(--cc-mono); font-weight: 600;\n}\n\n.cc-header-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }\n.cc-header-btn {\n  background: none;\n  border: none;\n  width: 26px;\n  height: 26px;\n  border-radius: 6px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  cursor: pointer;\n  color: var(--cc-text-muted);\n  padding: 0;\n  transition: background 0.12s, color 0.12s;\n}\n.cc-header-btn svg { width: 13px; height: 13px; }\n.cc-header-btn:hover {\n  background: var(--cc-surface-3);\n  color: var(--cc-text-secondary);\n}\n\n/* Context bar hidden — selection now shown in input area */\n\n/* ────────────────── SESSION LIST ────────────────── */\n.cc-session-list {\n  display: none;\n  flex-direction: column;\n  max-height: 200px;\n  overflow-y: auto;\n  border-bottom: 1px solid var(--cc-surface-3);\n  background: var(--cc-surface-0);\n}\n.cc-session-list.cc-sl-visible { display: flex; }\n.cc-sl-empty {\n  padding: 12px;\n  text-align: center;\n  color: var(--cc-text-ghost);\n  font-size: 12px;\n}\n.cc-sl-item {\n  display: flex;\n  align-items: center;\n  padding: 7px 12px;\n  gap: 8px;\n  cursor: pointer;\n  transition: background 0.1s;\n  border-bottom: 1px solid var(--cc-surface-2);\n}\n.cc-sl-item:last-child { border-bottom: none; }\n.cc-sl-item:hover { background: var(--cc-surface-2); }\n.cc-sl-item.cc-sl-active {\n  background: var(--cc-ember-dim);\n  border-left: 3px solid var(--cc-ember);\n  padding-left: 9px;\n}\n.cc-sl-info { flex: 1; min-width: 0; }\n.cc-sl-title {\n  font-size: 12px;\n  font-weight: 500;\n  color: var(--cc-text-primary);\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.cc-sl-time {\n  font-size: 10px;\n  color: var(--cc-text-ghost);\n  margin-top: 1px;\n}\n.cc-sl-del {\n  flex-shrink: 0;\n  background: none;\n  border: none;\n  color: var(--cc-text-ghost);\n  font-size: 16px;\n  cursor: pointer;\n  padding: 0 4px;\n  line-height: 1;\n  opacity: 0;\n  transition: opacity 0.1s, color 0.1s;\n}\n.cc-sl-item:hover .cc-sl-del { opacity: 1; }\n.cc-sl-del:hover { color: var(--cc-error); }\n\n/* Session list tabs */\n.cc-sl-tabs {\n  display: flex;\n  border-bottom: 1px solid var(--cc-surface-3);\n  flex-shrink: 0;\n}\n.cc-sl-tab {\n  flex: 1;\n  text-align: center;\n  padding: 7px 0;\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  cursor: pointer;\n  transition: color 0.12s, border-color 0.12s;\n  border-bottom: 2px solid transparent;\n}\n.cc-sl-tab:hover { color: var(--cc-text-primary); }\n.cc-sl-tab-active {\n  color: var(--cc-ember);\n  border-bottom-color: var(--cc-ember);\n  font-weight: 500;\n}\n.cc-sl-list-wrap {\n  overflow-y: auto;\n  max-height: 170px;\n}\n\n/* Import items */\n.cc-sl-lastq {\n  font-size: 10px;\n  color: var(--cc-ember);\n  margin-top: 1px;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  opacity: 0.8;\n}\n.cc-sl-meta {\n  font-size: 10px;\n  color: var(--cc-text-ghost);\n  margin-top: 1px;\n}\n.cc-sl-summary {\n  font-size: 10px;\n  color: var(--cc-text-muted);\n  margin-top: 2px;\n  display: -webkit-box;\n  -webkit-line-clamp: 2;\n  -webkit-box-orient: vertical;\n  overflow: hidden;\n  line-height: 1.3;\n}\n.cc-sl-import-btn {\n  flex-shrink: 0;\n  background: var(--cc-ember);\n  color: #fff;\n  border: none;\n  border-radius: 4px;\n  padding: 3px 10px;\n  font-size: 11px;\n  cursor: pointer;\n  font-family: var(--cc-font);\n  transition: opacity 0.12s;\n}\n.cc-sl-import-btn:hover { opacity: 0.85; }\n.cc-engine-badge {\n  display: inline-block;\n  font-size: 9px;\n  font-weight: 600;\n  color: #fff;\n  padding: 1px 5px;\n  border-radius: 3px;\n  margin-bottom: 2px;\n  letter-spacing: 0.3px;\n}\n\n/* Import notice */\n.cc-import-notice {\n  text-align: center;\n  padding: 16px;\n  color: var(--cc-text-secondary);\n  font-size: 12px;\n  line-height: 1.6;\n  background: var(--cc-ember-dim);\n  border-radius: var(--cc-r-sm);\n  margin: 8px;\n}\n.cc-import-notice strong {\n  color: var(--cc-ember);\n  font-size: 13px;\n}\n.cc-text-muted { color: var(--cc-text-ghost); }\n\n/* Engine switch notice */\n.cc-switch-notice {\n  text-align: center;\n  padding: 6px 12px;\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  border: 1px dashed var(--cc-surface-4);\n  border-radius: var(--cc-r-sm);\n  margin: 8px 14px 0;\n}\n.cc-switch-notice strong { font-weight: 600; }\n.cc-switch-back {\n  background: none;\n  border: none;\n  color: var(--cc-ember);\n  font-family: var(--cc-font);\n  font-size: 11px;\n  font-weight: 500;\n  cursor: pointer;\n  padding: 0;\n  text-decoration: underline;\n  text-underline-offset: 2px;\n}\n.cc-switch-back:hover { color: var(--cc-ember-hover); }\n\n/* ────────────────── MESSAGES ────────────────── */\n.cc-messages-wrap {\n  flex: 1;\n  position: relative;\n  overflow: hidden;\n  min-height: 0;\n}\n.cc-messages {\n  position: absolute;\n  inset: 0;\n  overflow-y: auto;\n  padding: 14px;\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n  user-select: text;\n}\n.cc-messages::-webkit-scrollbar { width: 4px; }\n.cc-messages::-webkit-scrollbar-track { background: transparent; }\n.cc-messages::-webkit-scrollbar-thumb {\n  background: var(--cc-surface-4);\n  border-radius: 2px;\n}\n\n/* Welcome */\n.cc-welcome {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  height: 100%;\n  gap: 10px;\n  color: var(--cc-text-muted);\n  text-align: center;\n  padding: 24px;\n}\n.cc-welcome-title {\n  font-size: 15px;\n  font-weight: 600;\n  color: var(--cc-text-primary);\n  letter-spacing: -0.02em;\n}\n.cc-welcome-hint {\n  font-size: 12px;\n  line-height: 1.7;\n  color: var(--cc-text-muted);\n  max-width: 260px;\n}\n.cc-welcome-shortcuts {\n  display: flex;\n  gap: 14px;\n  margin-top: 4px;\n  font-size: 11px;\n  color: var(--cc-text-ghost);\n}\n.cc-welcome-shortcuts kbd {\n  background: var(--cc-surface-3);\n  border: 1px solid var(--cc-surface-4);\n  border-radius: 4px;\n  padding: 1px 5px;\n  font-family: var(--cc-mono);\n  font-size: 10px;\n  color: var(--cc-text-muted);\n}\n.cc-welcome-dir { display: flex; justify-content: center; margin-top: 2px; }\n.cc-welcome-dir:empty { display: none; }\n.cc-welcome-dir .cc-dir-rootbtn { font-size: 12px; padding: 6px 14px; }\n.cc-welcome-dir .cc-dir-chip { font-size: 12px; padding: 5px 10px; margin-bottom: 0; }\n.cc-welcome-dir .cc-dir-name { flex: 0 1 auto; max-width: 200px; }\n\n/* ────────────────── BUBBLES ────────────────── */\n.cc-msg {\n  max-width: 88%;\n  animation: cc-msg-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);\n}\n@keyframes cc-msg-in {\n  from { opacity: 0; transform: translateY(4px); }\n  to   { opacity: 1; transform: none; }\n}\n\n/* No separate label — bubbles are self-evident by alignment */\n\n.cc-msg-user { align-self: flex-end; }\n.cc-msg-user .cc-msg-body {\n  background: var(--cc-ember);\n  color: #fff;\n  border-radius: var(--cc-r-sm) var(--cc-r-sm) 3px var(--cc-r-sm);\n  padding: 9px 13px;\n  line-height: 1.5;\n  font-size: 13px;\n  white-space: pre-wrap;\n  word-break: break-word;\n}\n\n.cc-msg-assistant { align-self: flex-start; }\n.cc-msg-assistant .cc-msg-body {\n  background: var(--cc-surface-2);\n  color: var(--cc-text-primary);\n  border-radius: var(--cc-r-sm) var(--cc-r-sm) var(--cc-r-sm) 3px;\n  padding: 10px 13px;\n  line-height: 1.6;\n  font-size: 13px;\n  word-break: break-word;\n  border: 1px solid var(--cc-surface-3);\n}\n\n/* ────────────────── ACTIVITY STEPS ────────────────── */\n.cc-activity { margin-bottom: 6px; }\n.cc-step {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 3px 0;\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  line-height: 1.3;\n}\n.cc-step-icon {\n  flex-shrink: 0;\n  width: 15px;\n  height: 15px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 10px;\n}\n.cc-step-icon.cc-spinning {\n  animation: cc-spin 1s linear infinite;\n}\n@keyframes cc-spin { to { transform: rotate(360deg); } }\n.cc-step-text { flex: 1; min-width: 0; }\n.cc-step-detail {\n  font-size: 10px;\n  color: var(--cc-text-ghost);\n  margin-top: 1px;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  line-height: 1.3;\n}\n\n/* Streaming cursor */\n.cc-cursor {\n  display: inline-block;\n  width: 1.5px;\n  height: 14px;\n  background: var(--cc-ember);\n  margin-left: 1px;\n  vertical-align: text-bottom;\n  animation: cc-blink 0.8s step-end infinite;\n}\n@keyframes cc-blink { 50% { opacity: 0; } }\n\n/* ────────────────── THOUGHT (intermediate text) ────────────────── */\n.cc-thought {\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  padding: 2px 0 2px 22px;\n  line-height: 1.4;\n  word-break: break-word;\n}\n\n/* ────────────────── COLLAPSED ACTIVITY SUMMARY ────────────────── */\n.cc-activity-summary {\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  padding: 4px 8px;\n  cursor: pointer;\n  border-radius: 4px;\n  display: flex;\n  align-items: center;\n  gap: 5px;\n  transition: background 0.12s;\n}\n.cc-activity-summary:hover {\n  background: var(--cc-surface-2);\n  color: var(--cc-text-secondary);\n}\n.cc-summary-toggle {\n  font-size: 9px;\n  color: var(--cc-text-ghost);\n  width: 12px;\n  text-align: center;\n}\n.cc-activity-details {\n  padding: 4px 0 4px 6px;\n  border-left: 2px solid var(--cc-surface-3);\n  margin-left: 5px;\n  margin-top: 4px;\n}\n\n/* ────────────────── INPUT ────────────────── */\n.cc-input-area {\n  flex-shrink: 0;\n  border-top: 1px solid var(--cc-surface-3);\n  padding: 10px 14px;\n  background: var(--cc-surface-1);\n}\n\n/* Selection quote bar above input */\n.cc-selection-bar {\n  display: none;\n  align-items: center;\n  gap: 6px;\n  padding: 5px 10px;\n  margin-bottom: 8px;\n  background: var(--cc-ember-dim);\n  border-left: 3px solid var(--cc-ember);\n  border-radius: 0 6px 6px 0;\n  font-size: 11px;\n  color: var(--cc-text-secondary);\n  line-height: 1.4;\n}\n.cc-sel-quote {\n  color: var(--cc-ember);\n  flex-shrink: 0;\n  display: flex;\n  align-items: center;\n}\n.cc-sel-quote svg { width: 13px; height: 13px; }\n.cc-sel-text {\n  flex: 1;\n  min-width: 0;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.cc-sel-clear {\n  flex-shrink: 0;\n  background: none;\n  border: none;\n  color: var(--cc-text-muted);\n  font-size: 14px;\n  cursor: pointer;\n  padding: 0 2px;\n  line-height: 1;\n}\n.cc-sel-clear:hover { color: var(--cc-text-primary); }\n\n/* ────────────────── IMAGE PREVIEWS ────────────────── */\n.cc-image-previews {\n  display: none;\n  flex-wrap: wrap;\n  gap: 6px;\n  padding-bottom: 8px;\n}\n.cc-img-thumb {\n  position: relative;\n  width: 52px;\n  height: 52px;\n  border-radius: 6px;\n  overflow: hidden;\n  border: 1px solid var(--cc-surface-3);\n  flex-shrink: 0;\n}\n.cc-img-thumb img {\n  width: 100%;\n  height: 100%;\n  object-fit: cover;\n  display: block;\n}\n.cc-img-rm {\n  position: absolute;\n  top: 1px;\n  right: 1px;\n  width: 16px;\n  height: 16px;\n  border-radius: 50%;\n  background: rgba(0,0,0,0.55);\n  color: #fff;\n  border: none;\n  font-size: 11px;\n  line-height: 1;\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  padding: 0;\n  opacity: 0;\n  transition: opacity 0.12s;\n}\n.cc-img-thumb:hover .cc-img-rm { opacity: 1; }\n\n/* Image attach button */\n.cc-img-btn {\n  flex-shrink: 0;\n  background: none;\n  border: none;\n  color: var(--cc-text-ghost);\n  cursor: pointer;\n  padding: 2px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  border-radius: 4px;\n  transition: color 0.12s, background 0.12s;\n}\n.cc-img-btn:hover {\n  color: var(--cc-ember);\n  background: var(--cc-ember-dim);\n}\n.cc-img-btn svg { width: 16px; height: 16px; }\n\n/* Drag-over state */\n.cc-input-wrapper.cc-drag-over {\n  border-color: var(--cc-ember) !important;\n  background: var(--cc-ember-dim) !important;\n}\n\n/* Images in user message */\n.cc-msg-images {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  margin-bottom: 6px;\n}\n.cc-msg-img {\n  max-width: 120px;\n  max-height: 90px;\n  border-radius: 6px;\n  object-fit: cover;\n  cursor: pointer;\n}\n.cc-msg-img:hover { opacity: 0.85; }\n\n.cc-input-wrapper {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  background: var(--cc-surface-0);\n  border: 1px solid var(--cc-surface-3);\n  border-radius: var(--cc-r-sm);\n  padding: 6px 10px;\n  min-height: 36px;\n  transition: border-color 0.15s, box-shadow 0.15s;\n}\n.cc-input-wrapper:focus-within {\n  border-color: var(--cc-ember);\n  box-shadow: 0 0 0 2px var(--cc-ember-dim);\n}\n.cc-input {\n  flex: 1;\n  border: none;\n  background: transparent;\n  resize: none;\n  font-family: var(--cc-font);\n  font-size: 13px;\n  outline: none;\n  color: var(--cc-text-primary);\n  line-height: 20px;\n  max-height: 120px;\n  min-height: 20px;\n  height: 20px;\n  padding: 0;\n  margin: 0;\n  vertical-align: middle;\n}\n.cc-input::placeholder { color: var(--cc-text-ghost); }\n\n.cc-send-btn {\n  flex-shrink: 0;\n  width: 30px;\n  height: 30px;\n  border-radius: var(--cc-r-sm);\n  border: none;\n  background: var(--cc-ember);\n  color: #fff;\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  padding: 0;\n  transition: background 0.12s, opacity 0.1s;\n}\n.cc-send-btn svg {\n  width: 14px; height: 14px;\n  fill: none; stroke: currentColor; stroke-width: 2;\n}\n.cc-send-btn:hover:not(:disabled) { background: var(--cc-ember-hover); }\n.cc-send-btn:active:not(:disabled) { opacity: 0.8; }\n.cc-send-btn:disabled { opacity: 0.3; cursor: not-allowed; }\n\n.cc-input-footer {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  margin-top: 6px;\n  padding: 0 2px;\n}\n.cc-checkbox {\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  display: flex;\n  align-items: center;\n  gap: 4px;\n  cursor: pointer;\n  user-select: none;\n}\n.cc-checkbox input[type=\"checkbox\"] {\n  width: 13px; height: 13px;\n  accent-color: var(--cc-ember);\n  margin: 0;\n}\n.cc-engine-switch {\n  background: none;\n  border: 1px solid var(--cc-surface-4);\n  border-radius: 4px;\n  padding: 1px 7px;\n  font-size: 10px;\n  font-family: var(--cc-font);\n  color: var(--cc-text-secondary);\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n  transition: border-color 0.15s, background 0.15s;\n}\n.cc-engine-switch:hover { border-color: var(--cc-text-muted); background: var(--cc-surface-2); }\n.cc-engine-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }\n.cc-engine-arrow { font-size: 8px; color: var(--cc-text-ghost); }\n.cc-input-hint {\n  font-size: 10px;\n  color: var(--cc-text-ghost);\n  display: flex;\n  align-items: center;\n  gap: 3px;\n}\n.cc-input-hint kbd {\n  background: var(--cc-surface-3);\n  border: 1px solid var(--cc-surface-4);\n  border-radius: 3px;\n  padding: 0 4px;\n  font-family: var(--cc-mono);\n  font-size: 9px;\n  color: var(--cc-text-muted);\n}\n\n/* ────────────────── STOP BUTTON ────────────────── */\n.cc-stop-btn {\n  display: none;\n  align-items: center;\n  justify-content: center;\n  gap: 4px;\n  background: transparent;\n  border: 1px solid var(--cc-surface-4);\n  border-radius: 6px;\n  padding: 3px 10px;\n  font-family: var(--cc-font);\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  cursor: pointer;\n  transition: background 0.12s, color 0.12s, border-color 0.12s;\n  margin: 0 auto 6px;\n}\n.cc-stop-btn:hover {\n  background: var(--cc-error-bg);\n  color: var(--cc-error);\n  border-color: var(--cc-error);\n}\n.cc-stop-btn.cc-active { display: inline-flex; }\n\n/* ────────────────── MESSAGE ACTIONS ────────────────── */\n.cc-msg-actions {\n  display: flex;\n  gap: 6px;\n  padding: 4px 0 0;\n}\n.cc-action-btn {\n  display: inline-flex;\n  align-items: center;\n  gap: 3px;\n  background: none;\n  border: 1px solid var(--cc-surface-3);\n  border-radius: 4px;\n  padding: 2px 8px;\n  font-family: var(--cc-font);\n  font-size: 10px;\n  color: var(--cc-text-muted);\n  cursor: pointer;\n  transition: background 0.12s, color 0.12s, border-color 0.12s;\n}\n.cc-action-btn:hover {\n  background: var(--cc-surface-2);\n  color: var(--cc-text-secondary);\n  border-color: var(--cc-surface-4);\n}\n.cc-action-btn svg { width: 11px; height: 11px; }\n\n/* ────────────────── QUICK ACTIONS ────────────────── */\n.cc-quick-actions {\n  display: flex;\n  gap: 6px;\n  padding-bottom: 8px;\n  flex-wrap: wrap;\n}\n.cc-quick-btn {\n  background: var(--cc-surface-2);\n  border: 1px solid var(--cc-surface-3);\n  border-radius: 12px;\n  padding: 3px 10px;\n  font-family: var(--cc-font);\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  cursor: pointer;\n  transition: background 0.12s, color 0.12s, border-color 0.12s;\n  white-space: nowrap;\n}\n.cc-quick-btn:hover {\n  background: var(--cc-ember-dim);\n  color: var(--cc-ember);\n  border-color: var(--cc-ember);\n}\n\n/* ────────────────── LINKED DOCS ────────────────── */\n/* 关联文档 / 关联目录 两个按钮并排成一行工具条；各自的内容落到下方 */\n.cc-attach-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-bottom: 6px; }\n.cc-attach-docs, .cc-attach-dirs { display: inline-flex; }\n.cc-attach-dirs:empty { display: none; }\n.cc-linked-docs { padding-bottom: 6px; }\n.cc-linked-docs:empty { display: none; padding-bottom: 0; }\n.cc-link-header {\n  display: flex; align-items: center; gap: 4px;\n  font-size: 10px; color: var(--cc-text-ghost); margin-bottom: 3px;\n}\n.cc-link-header svg { width: 10px; height: 10px; }\n.cc-link-item {\n  display: flex; align-items: center; gap: 4px;\n  padding: 3px 8px; background: var(--cc-ember-dim);\n  border-radius: 4px; margin-bottom: 2px; font-size: 11px;\n  border-left: 2px solid var(--cc-ember);\n}\n.cc-link-title {\n  flex: 1; min-width: 0;\n  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\n  color: var(--cc-text-secondary);\n}\n.cc-link-rm {\n  flex-shrink: 0; background: none; border: none;\n  color: var(--cc-text-ghost); font-size: 14px;\n  cursor: pointer; padding: 0 2px; line-height: 1;\n}\n.cc-link-rm:hover { color: var(--cc-error); }\n\n/* Toggle button */\n.cc-link-toggle {\n  display: inline-flex;\n  align-items: center;\n  gap: 4px;\n  background: none;\n  border: 1px dashed var(--cc-surface-4);\n  border-radius: 6px;\n  padding: 3px 10px;\n  font-family: var(--cc-font);\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  cursor: pointer;\n  transition: background 0.12s, color 0.12s, border-color 0.12s;\n}\n.cc-link-toggle:hover {\n  background: var(--cc-ember-dim);\n  color: var(--cc-ember);\n  border-color: var(--cc-ember);\n}\n.cc-link-toggle svg { width: 11px; height: 11px; }\n.cc-link-toggle-arrow {\n  font-size: 8px;\n  margin-left: 2px;\n}\n\n/* Search input */\n.cc-link-search-wrap { position: relative; }\n.cc-link-search {\n  width: 100%; box-sizing: border-box;\n  border: 1px solid var(--cc-surface-3);\n  border-radius: 6px;\n  padding: 4px 8px;\n  font-family: var(--cc-font);\n  font-size: 11px;\n  color: var(--cc-text-primary);\n  background: var(--cc-surface-0);\n  outline: none;\n  transition: border-color 0.12s;\n}\n.cc-link-search:focus { border-color: var(--cc-ember); }\n.cc-link-search::placeholder { color: var(--cc-text-ghost); }\n.cc-link-results {\n  max-height: 130px;\n  overflow-y: auto;\n  border: 1px solid var(--cc-surface-3);\n  border-top: none;\n  border-radius: 0 0 6px 6px;\n  background: var(--cc-surface-1);\n  display: none;\n}\n.cc-link-search:focus ~ .cc-link-results,\n.cc-link-results:hover { display: block; }\n.cc-link-results:empty { display: none; }\n.cc-link-loading {\n  padding: 8px; text-align: center;\n  font-size: 11px; color: var(--cc-text-ghost);\n}\n.cc-link-result {\n  display: flex; align-items: center; justify-content: space-between;\n  padding: 5px 8px; cursor: pointer;\n  transition: background 0.1s;\n}\n.cc-link-result:hover { background: var(--cc-surface-2); }\n.cc-link-result-name {\n  font-size: 11px; color: var(--cc-text-primary);\n  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\n  flex: 1; min-width: 0;\n}\n.cc-link-result-meta {\n  font-size: 10px; color: var(--cc-text-ghost);\n  flex-shrink: 0; margin-left: 8px;\n}\n\n/* ────────────────── LINKED DIRS (① root / ② ref) ────────────────── */\n.cc-linked-dirs { padding-bottom: 6px; }\n.cc-linked-dirs:empty { display: none; padding-bottom: 0; }\n\n.cc-dir-rootbtn {\n  display: inline-flex; align-items: center; gap: 6px;\n  background: var(--cc-ember-dim);\n  border: 1px dashed var(--cc-ember);\n  border-radius: 6px;\n  padding: 5px 12px;\n  font-family: var(--cc-font); font-size: 12px;\n  color: var(--cc-ember); cursor: pointer;\n  transition: background 0.12s;\n}\n.cc-dir-rootbtn:hover { background: var(--cc-ember-glow); }\n.cc-dir-rootbtn svg { width: 13px; height: 13px; }\n\n/* 目录 chip：对齐「关联文档」——左侧色条 + 角色文字 + 目录名为主 */\n.cc-dir-chip {\n  display: flex; align-items: center; gap: 6px;\n  padding: 3px 8px; border-radius: 4px; margin-bottom: 3px; font-size: 11px;\n}\n.cc-dir-chip:last-child { margin-bottom: 0; }\n.cc-dir-root { background: var(--cc-ember-dim); border-left: 2px solid var(--cc-ember); }\n.cc-dir-ref  { background: var(--cc-surface-2); border-left: 2px solid var(--cc-surface-4); }\n.cc-dir-role { flex-shrink: 0; font-size: 10px; color: var(--cc-text-muted); }\n.cc-dir-root .cc-dir-role { color: var(--cc-ember); }\n.cc-dir-name {\n  flex: 1; min-width: 0;\n  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\n  font-family: var(--cc-mono); font-size: 11px; font-weight: 600;\n  color: var(--cc-text-primary);\n}\n.cc-dir-lock { flex-shrink: 0; font-size: 10px; opacity: 0.7; }\n.cc-dir-rm {\n  flex-shrink: 0; background: none; border: none;\n  color: var(--cc-text-ghost); font-size: 14px; line-height: 1;\n  cursor: pointer; padding: 0 2px;\n}\n.cc-dir-rm:hover { color: var(--cc-error); }\n\n.cc-git-badge {\n  display: inline-block;\n  font-family: var(--cc-mono); font-size: 9px; line-height: 1.5;\n  padding: 0 4px; border-radius: 3px;\n  background: var(--cc-ember); color: #fff;\n  text-transform: uppercase; letter-spacing: 0.03em;\n}\n\n/* Directory picker overlay */\n.cc-dir-picker {\n  display: none;\n  position: absolute; inset: 0; z-index: 30;\n  background: rgba(0, 0, 0, 0.28);\n  align-items: center; justify-content: center;\n  padding: 16px;\n}\n.cc-dir-picker.cc-dp-visible { display: flex; }\n.cc-dp-box {\n  width: 100%; max-width: 380px; max-height: 88%;\n  display: flex; flex-direction: column;\n  background: var(--cc-surface-1);\n  border: 1px solid var(--cc-surface-3);\n  border-radius: var(--cc-r-sm);\n  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);\n  overflow: hidden;\n}\n.cc-dp-head {\n  display: flex; align-items: center; justify-content: space-between;\n  padding: 10px 12px; border-bottom: 1px solid var(--cc-surface-3);\n}\n.cc-dp-title { font-size: 12px; font-weight: 600; color: var(--cc-text-primary); }\n.cc-dp-close {\n  background: none; border: none; color: var(--cc-text-muted);\n  font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px;\n}\n.cc-dp-close:hover { color: var(--cc-text-primary); }\n.cc-dp-bar {\n  display: flex; align-items: center; gap: 6px;\n  padding: 8px 12px; border-bottom: 1px solid var(--cc-surface-3);\n  background: var(--cc-surface-0);\n}\n.cc-dp-up {\n  flex-shrink: 0;\n  background: var(--cc-surface-2); border: 1px solid var(--cc-surface-3);\n  border-radius: 5px; padding: 2px 8px;\n  font-size: 11px; color: var(--cc-text-secondary); cursor: pointer;\n}\n.cc-dp-up:hover { border-color: var(--cc-ember); color: var(--cc-ember); }\n.cc-dp-up-off { opacity: 0.35; cursor: default; }\n.cc-dp-cwd {\n  flex: 1; min-width: 0;\n  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\n  direction: rtl; text-align: left;\n  font-family: var(--cc-mono); font-size: 10px; color: var(--cc-text-muted);\n}\n.cc-dp-use {\n  flex-shrink: 0;\n  background: var(--cc-ember); border: none; color: #fff;\n  border-radius: 5px; padding: 3px 9px;\n  font-size: 11px; font-weight: 600; cursor: pointer;\n}\n.cc-dp-use:hover { background: var(--cc-ember-hover); }\n.cc-dp-scroll { flex: 1; overflow-y: auto; min-height: 80px; }\n.cc-dp-section {\n  padding: 6px 12px 3px;\n  font-size: 10px; color: var(--cc-text-ghost);\n  text-transform: uppercase; letter-spacing: 0.04em;\n  position: sticky; top: 0; background: var(--cc-surface-1);\n}\n.cc-dp-row {\n  display: flex; align-items: center; gap: 7px;\n  padding: 6px 12px; cursor: pointer; transition: background 0.1s;\n}\n.cc-dp-row:hover { background: var(--cc-surface-2); }\n.cc-dp-ico { flex-shrink: 0; min-width: 28px; display: inline-flex; align-items: center; color: var(--cc-text-muted); }\n.cc-dp-ico svg { width: 15px; height: 15px; }\n.cc-dp-name {\n  flex: 1; min-width: 0;\n  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\n  font-size: 12px; color: var(--cc-text-primary);\n}\n.cc-dp-rowbtn {\n  flex-shrink: 0;\n  background: none; border: 1px solid var(--cc-surface-4);\n  border-radius: 5px; padding: 2px 8px;\n  font-size: 10px; color: var(--cc-text-muted); cursor: pointer;\n  transition: border-color 0.1s, color 0.1s;\n}\n.cc-dp-rowbtn:hover { border-color: var(--cc-ember); color: var(--cc-ember); }\n.cc-dp-msg { padding: 12px; text-align: center; font-size: 11px; color: var(--cc-text-ghost); }\n.cc-dp-msg-err { color: var(--cc-error); }\n.cc-dp-manual {\n  position: relative;\n  padding: 8px 12px; border-top: 1px solid var(--cc-surface-3);\n  background: var(--cc-surface-0);\n}\n.cc-dp-input {\n  width: 100%; box-sizing: border-box;\n  border: 1px solid var(--cc-surface-3); border-radius: 6px;\n  padding: 5px 9px;\n  font-family: var(--cc-mono); font-size: 11px;\n  color: var(--cc-text-primary); background: var(--cc-surface-1);\n  outline: none; transition: border-color 0.12s;\n}\n.cc-dp-input:focus { border-color: var(--cc-ember); }\n.cc-dp-input::placeholder { color: var(--cc-text-ghost); font-family: var(--cc-font); }\n.cc-dp-suggest {\n  display: none;\n  position: absolute; left: 12px; right: 12px; bottom: calc(100% - 4px);\n  max-height: 190px; overflow-y: auto;\n  background: var(--cc-surface-1);\n  border: 1px solid var(--cc-surface-3); border-radius: 6px;\n  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.18);\n  z-index: 5;\n}\n.cc-dp-sug { display: flex; align-items: center; gap: 7px; padding: 5px 10px; cursor: pointer; }\n.cc-dp-sug:hover, .cc-dp-sug-on { background: var(--cc-surface-2); }\n.cc-dp-sug-ico { flex-shrink: 0; min-width: 22px; display: inline-flex; align-items: center; color: var(--cc-text-muted); }\n.cc-dp-sug-ico svg { width: 14px; height: 14px; }\n.cc-dp-sug-name {\n  flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\n  font-size: 12px; color: var(--cc-text-primary); font-family: var(--cc-mono);\n}\n\n/* ────────────────── MARKDOWN ────────────────── */\n.cc-md { font-size: 13px; line-height: 1.65; }\n.cc-md p { margin: 0 0 8px; }\n.cc-md p:last-child { margin-bottom: 0; }\n.cc-md h1,.cc-md h2,.cc-md h3,.cc-md h4,.cc-md h5,.cc-md h6 {\n  font-weight: 600; margin: 12px 0 4px; line-height: 1.3;\n  color: var(--cc-text-primary);\n}\n.cc-md h1 { font-size: 16px; }\n.cc-md h2 { font-size: 15px; }\n.cc-md h3 { font-size: 14px; }\n.cc-md h4,.cc-md h5,.cc-md h6 { font-size: 13px; }\n.cc-md h1:first-child,.cc-md h2:first-child,.cc-md h3:first-child { margin-top: 0; }\n.cc-md strong { font-weight: 600; color: var(--cc-text-primary); }\n.cc-md em { font-style: italic; }\n.cc-md code {\n  font-family: var(--cc-mono);\n  font-size: 11.5px;\n  background: var(--cc-surface-3);\n  padding: 1.5px 5px;\n  border-radius: 4px;\n  color: var(--cc-text-primary);\n}\n.cc-md pre {\n  background: #1e1e2e;\n  border: 1px solid var(--cc-surface-3);\n  color: #cdd6f4;\n  padding: 10px 12px;\n  border-radius: var(--cc-r-sm);\n  overflow-x: auto;\n  margin: 8px 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n.cc-md pre code {\n  background: none;\n  padding: 0;\n  font-size: inherit;\n  color: inherit;\n  border-radius: 0;\n}\n.cc-md ul,.cc-md ol { padding-left: 18px; margin: 4px 0; }\n.cc-md li { margin: 2px 0; line-height: 1.5; }\n.cc-md blockquote {\n  border-left: 2px solid var(--cc-ember);\n  padding: 3px 10px;\n  margin: 6px 0;\n  color: var(--cc-text-secondary);\n  background: var(--cc-ember-dim);\n  border-radius: 0 4px 4px 0;\n}\n.cc-md a { color: var(--cc-ember); text-decoration: none; }\n.cc-md a:hover { text-decoration: underline; }\n.cc-md hr { border: none; border-top: 1px solid var(--cc-surface-3); margin: 10px 0; }\n.cc-md table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 12px; }\n.cc-md th,.cc-md td {\n  border: 1px solid var(--cc-surface-3);\n  padding: 5px 8px;\n  text-align: left;\n}\n.cc-md th { background: var(--cc-surface-2); font-weight: 600; }\n\n/* ────────────────── ERROR ────────────────── */\n.cc-error {\n  color: var(--cc-error);\n  padding: 8px 10px;\n  background: var(--cc-error-bg);\n  border-radius: var(--cc-r-sm);\n  line-height: 1.5;\n  font-size: 12px;\n  border: 1px solid rgba(224, 92, 92, 0.15);\n}\n.cc-retry-btn {\n  display: inline-block;\n  margin-top: 8px;\n  padding: 4px 14px;\n  border: 1px solid var(--cc-error);\n  border-radius: 6px;\n  background: transparent;\n  color: var(--cc-error);\n  font-family: var(--cc-font);\n  font-size: 12px;\n  cursor: pointer;\n  transition: background 0.12s, color 0.12s;\n}\n.cc-retry-btn:hover {\n  background: var(--cc-error);\n  color: #fff;\n}\n.cc-error code {\n  background: rgba(224,92,92,0.1);\n  padding: 1px 4px;\n  border-radius: 3px;\n  font-family: var(--cc-mono);\n  font-size: 11px;\n}\n\n/* ────────────────── STOPPED ────────────────── */\n.cc-stopped {\n  font-size: 11px;\n  color: var(--cc-text-muted);\n  padding: 4px 0;\n  margin-top: 4px;\n}\n\n/* ────────────────── RESIZE HANDLE ────────────────── */\n.cc-resize-handle {\n  position: absolute;\n  right: 0;\n  bottom: 0;\n  width: 16px;\n  height: 16px;\n  cursor: nwse-resize;\n  z-index: 1;\n}\n.cc-resize-handle::after {\n  content: '';\n  position: absolute;\n  right: 4px;\n  bottom: 4px;\n  width: 6px;\n  height: 6px;\n  border-right: 2px solid var(--cc-surface-4);\n  border-bottom: 2px solid var(--cc-surface-4);\n  opacity: 0.4;\n  transition: opacity 0.15s;\n}\n.cc-panel:hover .cc-resize-handle::after {\n  opacity: 0.7;\n}\n\n/* ────────────────── DARK MODE ────────────────── */\n@media (prefers-color-scheme: dark) {\n  :root {\n    --cc-surface-0: #1a1a1c;\n    --cc-surface-1: #222224;\n    --cc-surface-2: #2a2a2d;\n    --cc-surface-3: #333337;\n    --cc-surface-4: #3e3e43;\n    --cc-text-primary: #ececef;\n    --cc-text-secondary: #a0a0a8;\n    --cc-text-muted: #6c6c75;\n    --cc-text-ghost: #4a4a52;\n    --cc-ember-glow: rgba(217, 119, 87, 0.18);\n    --cc-ember-dim: rgba(217, 119, 87, 0.1);\n  }\n  .cc-status-dot { border-color: var(--cc-surface-0); }\n  .cc-update-dot { border-color: var(--cc-surface-0); }\n  .cc-msg-user .cc-msg-body { background: var(--cc-ember); color: #fff; }\n  .cc-md pre { background: #0d0d14; border-color: var(--cc-surface-3); color: #cdd6f4; }\n}\n";document.head.appendChild(s)})();
 
 // ProseMirror bridge — only in top frame (in iframe/WOA, the relay handles selection)
 if (window.top === window) {
@@ -151,9 +151,11 @@ if (window.top === window) {
     plus: `<svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 5v14M5 12h14" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg>`,
     list: `<svg viewBox="0 0 24 24" width="14" height="14"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg>`,
     link: `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg>`,
+    folder: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M3 7.5A1.5 1.5 0 014.5 6h3.7a1.5 1.5 0 011.06.44L10.83 7.7H19.5A1.5 1.5 0 0121 9.2v8.3a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 17.5v-10z" stroke="currentColor" fill="none" stroke-width="1.7" stroke-linejoin="round"/></svg>`,
     copy: `<svg viewBox="0 0 24 24" width="12" height="12"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" fill="none" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
     docWrite: `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" fill="none" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" fill="none" stroke-width="2"/></svg>`,
     quote: `<svg viewBox="0 0 16 16" width="13" height="13"><path d="M4 2v3a6 6 0 006 6h2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 9l2 2-2 2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    image: `<svg viewBox="0 0 24 24" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" fill="none" stroke-width="2"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" fill="none" stroke-width="1.5"/><path d="M21 15l-5-5L5 21" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   };
 
   // ========== FAB ==========
@@ -183,9 +185,13 @@ if (window.top === window) {
     <button class="cc-stop-btn">${ICON.stop} 停止生成</button>
     <div class="cc-input-area">
       <div class="cc-quick-actions"></div>
+      <div class="cc-attach-row"><span class="cc-attach-docs"></span><span class="cc-attach-dirs"></span></div>
       <div class="cc-linked-docs"></div>
+      <div class="cc-linked-dirs"></div>
       <div class="cc-selection-bar"></div>
+      <div class="cc-image-previews"></div>
       <div class="cc-input-wrapper">
+        <button class="cc-img-btn" title="添加图片 (可粘贴/拖放)">${ICON.image}</button>
         <textarea class="cc-input" rows="1" placeholder="输入你的请求…"></textarea>
         <button class="cc-send-btn" title="发送 (Enter)">${ICON.send}</button>
       </div>
@@ -203,7 +209,11 @@ if (window.top === window) {
   const msgsWrap = panel.querySelector(".cc-messages-wrap");
   const selectionBar = panel.querySelector(".cc-selection-bar");
   const linkedDocsEl = panel.querySelector(".cc-linked-docs");
+  const linkedDirsEl = panel.querySelector(".cc-linked-dirs");
+  const attachDocsEl = panel.querySelector(".cc-attach-docs");
+  const attachDirsEl = panel.querySelector(".cc-attach-dirs");
   let linkedDocs = []; // [{ url, title }]
+  let pendingImages = []; // [{ data: base64, name: string, type: string }]
   const sessionListEl = panel.querySelector(".cc-session-list");
   const engineSwitchBtn = panel.querySelector(".cc-engine-switch");
   const headerTitleEl = panel.querySelector(".cc-title");
@@ -213,17 +223,49 @@ if (window.top === window) {
   function renderEngineSwitch() {
     const m = ENGINE_META[currentEngine] || { label: currentEngine, color: "#888", title: currentEngine };
     engineSwitchBtn.innerHTML = `<span class="cc-engine-dot" style="background:${m.color}"></span>${m.label} <span class="cc-engine-arrow">▾</span>`;
-    headerTitleEl.innerHTML = `${ICON.claude} ${m.title}`;
+    renderHeaderTitle();
     const conv = activeConv();
     const welcome = conv?.container.querySelector(".cc-welcome-title");
     if (welcome) welcome.textContent = m.title;
   }
+  // 标题栏：会话已绑定工作目录且已激活 → 显示「📂 目录名」，否则显示引擎标题
+  function renderHeaderTitle() {
+    const conv = activeConv();
+    if (conv && conv.engineCwd && (conv.engineSessionId || isStreaming)) {
+      headerTitleEl.innerHTML = `${ICON.folder}<span class="cc-title-dir" title="工作目录：${esc(conv.engineCwd)}（会话已绑定此目录，换目录请新建会话）">${esc(basename(conv.engineCwd))}</span>`;
+    } else {
+      const m = ENGINE_META[currentEngine] || { title: currentEngine };
+      headerTitleEl.innerHTML = `${ICON.claude} ${esc(m.title)}`;
+    }
+  }
   engineSwitchBtn.addEventListener("click", () => {
     const idx = ENGINE_IDS.indexOf(currentEngine);
-    currentEngine = ENGINE_IDS[(idx + 1) % ENGINE_IDS.length];
+    const newEngine = ENGINE_IDS[(idx + 1) % ENGINE_IDS.length];
     const conv = activeConv();
-    if (conv && !conv.engineSessionId) conv.engine = currentEngine;
-    renderEngineSwitch();
+    if (conv && !conv.engineSessionId && !isStreaming) {
+      currentEngine = newEngine;
+      conv.engine = currentEngine;
+      renderEngineSwitch();
+    } else {
+      const prevConvId = activeConvId;
+      currentEngine = newEngine;
+      const created = newConversation();
+      const notice = document.createElement("div");
+      notice.className = "cc-switch-notice";
+      notice.style.borderColor = (ENGINE_META[newEngine]?.color || "#888") + "40";
+      const newMeta = ENGINE_META[newEngine];
+      notice.innerHTML = `已切换至 <strong style="color:${esc(newMeta.color)}">${esc(newMeta.label)}</strong> · <button class="cc-switch-back">返回上个对话</button>`;
+      notice.querySelector(".cc-switch-back").addEventListener("click", () => {
+        const newId = created.id;
+        if (prevConvId && getConv(prevConvId)) showConv(prevConvId);
+        created.container.remove();
+        convs = convs.filter(c => c.id !== newId);
+        persistIndex();
+      });
+      const welcome = created.container.querySelector(".cc-welcome");
+      if (welcome) created.container.insertBefore(notice, welcome);
+      else created.container.appendChild(notice);
+    }
   });
   renderEngineSwitch();
 
@@ -238,7 +280,7 @@ if (window.top === window) {
   function makeConv(title) {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const container = createConvContainer();
-    return { id, engine: currentEngine, engineSessionId: null, engineCwd: null, isImported: false, originSessionId: null, title: title || "新会话", container, createdAt: Date.now() };
+    return { id, engine: currentEngine, engineSessionId: null, engineCwd: null, refDirs: [], isImported: false, originSessionId: null, title: title || "新会话", container, createdAt: Date.now() };
   }
 
   function showConv(id) {
@@ -251,6 +293,7 @@ if (window.top === window) {
     activeConvId = id;
     currentEngine = conv.engine || "claude";
     renderEngineSwitch();
+    renderLinkedDirs();
     hideSessionList();
   }
 
@@ -289,8 +332,8 @@ if (window.top === window) {
   function persistIndex() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(convs.map(c => ({
-        id: c.id, engine: c.engine || "claude", engineSessionId: c.engineSessionId, engineCwd: c.engineCwd, isImported: c.isImported, originSessionId: c.originSessionId, title: c.title, createdAt: c.createdAt,
-        html: c.container.innerHTML,
+        id: c.id, engine: c.engine || "claude", engineSessionId: c.engineSessionId, engineCwd: c.engineCwd, refDirs: c.refDirs || [], isImported: c.isImported, originSessionId: c.originSessionId, title: c.title, createdAt: c.createdAt,
+        html: c.container.innerHTML.replace(/src="data:image\/[^"]+"/g, 'src="" data-stripped="1"'),
       }))));
     } catch (_) {}
   }
@@ -323,7 +366,7 @@ if (window.top === window) {
         rebindContainerEvents(container);
         container.style.display = "none";
         msgsWrap.appendChild(container);
-        convs.push({ id: s.id, engine: s.engine || "claude", engineSessionId: s.engineSessionId || s.claudeSessionId || s.codexSessionId || null, engineCwd: s.engineCwd || s.claudeCwd || s.codexCwd || null, isImported: !!s.isImported, originSessionId: s.originSessionId || null, title: s.title, container, createdAt: s.createdAt });
+        convs.push({ id: s.id, engine: s.engine || "claude", engineSessionId: s.engineSessionId || s.claudeSessionId || s.codexSessionId || null, engineCwd: s.engineCwd || s.claudeCwd || s.codexCwd || null, refDirs: Array.isArray(s.refDirs) ? s.refDirs : [], isImported: !!s.isImported, originSessionId: s.originSessionId || null, title: s.title, container, createdAt: s.createdAt });
       });
     } catch (_) {}
     if (convs.length > 0) showConv(convs[0].id);
@@ -403,6 +446,7 @@ if (window.top === window) {
     conv.engine = s.engine || "claude";
     conv.engineSessionId = s.sessionId;
     conv.engineCwd = s.cwd || null;
+    conv.refDirs = [];
     conv.isImported = true;
     conv.originSessionId = s.sessionId;
     convs.unshift(conv);
@@ -536,14 +580,15 @@ if (window.top === window) {
   let linkExpanded = false;
 
   function renderLinkedDocs() {
+    attachDocsEl.innerHTML = "";
     linkedDocsEl.innerHTML = "";
     const toggleBtn = document.createElement("button");
     toggleBtn.className = "cc-link-toggle";
     toggleBtn.innerHTML = linkedDocs.length > 0
       ? `${ICON.link} 关联文档 (${linkedDocs.length}) <span class="cc-link-toggle-arrow">${linkExpanded ? "▼" : "▶"}</span>`
-      : `${ICON.plus} 关联文档`;
+      : `${ICON.link} 关联文档`;
     toggleBtn.addEventListener("click", () => { linkExpanded = !linkExpanded; renderLinkedDocs(); });
-    linkedDocsEl.appendChild(toggleBtn);
+    attachDocsEl.appendChild(toggleBtn);
     if (!linkExpanded) return;
 
     linkedDocs.forEach((doc, i) => {
@@ -594,16 +639,334 @@ if (window.top === window) {
 
   renderLinkedDocs();
 
+  // ========== LINKED DIRS (① 会话根目录 / ② 附加参考目录) ==========
+  function shortenPath(p) {
+    if (!p) return "";
+    return p.replace(/^\/Users\/[^/]+/, "~").replace(/^\/home\/[^/]+/, "~");
+  }
+  function basename(p) {
+    if (!p) return "";
+    const s = String(p).replace(/\/+$/, "");
+    return s.slice(s.lastIndexOf("/") + 1) || s;
+  }
+
+  async function getRecentDirs() {
+    let client = [];
+    try { const d = await __csLocal.get("cc_recent_dirs"); client = d.cc_recent_dirs || []; } catch (_) {}
+    let server = [];
+    try { const r = await fetch(BRIDGE + "/recent-dirs"); const j = await r.json(); if (j.ok) server = j.dirs || []; } catch (_) {}
+    const merged = [], seen = new Set();
+    for (const x of [...client, ...server]) {
+      if (x && x.path && !seen.has(x.path)) { seen.add(x.path); merged.push({ path: x.path, label: x.label || shortenPath(x.path), isGit: !!x.isGit }); }
+    }
+    return merged.slice(0, 10);
+  }
+  async function pushRecentDir(dir) {
+    let cur = [];
+    try { const d = await __csLocal.get("cc_recent_dirs"); cur = d.cc_recent_dirs || []; } catch (_) {}
+    cur = cur.filter(x => x.path !== dir.path);
+    cur.unshift({ path: dir.path, label: dir.label || shortenPath(dir.path), isGit: !!dir.isGit });
+    try { __csLocal.set({ cc_recent_dirs: cur.slice(0, 10) }); } catch (_) {}
+  }
+
+  // --- Directory picker overlay (shared by root & ref) ---
+  const dirPickerEl = document.createElement("div");
+  dirPickerEl.className = "cc-dir-picker";
+  panel.appendChild(dirPickerEl);
+  dirPickerEl.addEventListener("click", (e) => { if (e.target === dirPickerEl) closeDirPicker(); });
+  let dpState = { mode: "root", onPick: null, title: "", path: null, parent: null, home: null, isGitRepo: false, entries: [], recents: [], loading: false, error: "" };
+
+  async function openDirPicker(opts) {
+    dpState = { mode: opts.mode || "root", onPick: opts.onPick, title: opts.title || "选择目录", path: null, parent: null, home: null, isGitRepo: false, entries: [], recents: [], loading: true, error: "" };
+    dirPickerEl.classList.add("cc-dp-visible");
+    renderDirPicker();
+    dpState.recents = await getRecentDirs();
+    await browseDir("");
+  }
+  function closeDirPicker() { dirPickerEl.classList.remove("cc-dp-visible"); dpState.onPick = null; }
+
+  async function browseDir(path) {
+    dpState.loading = true; dpState.error = ""; renderDirPicker();
+    try {
+      const r = await fetch(BRIDGE + "/list-dir?path=" + encodeURIComponent(path || ""));
+      const d = await r.json();
+      if (!d.ok) { dpState.loading = false; dpState.error = d.error || "无法打开目录"; renderDirPicker(); return; }
+      dpState.path = d.path; dpState.parent = d.parent; dpState.home = d.home; dpState.isGitRepo = !!d.isGitRepo; dpState.entries = d.entries || []; dpState.loading = false;
+      renderDirPicker();
+    } catch (_) {
+      dpState.loading = false; dpState.error = "无法连接 Bridge"; renderDirPicker();
+    }
+  }
+
+  function commitDir(dir) {
+    const cb = dpState.onPick;
+    closeDirPicker();
+    if (cb) cb(dir);
+    pushRecentDir(dir);
+  }
+  function rowIsGit(path) {
+    const e = dpState.entries.find(x => x.path === path) || dpState.recents.find(x => x.path === path);
+    return e ? !!e.isGit : false;
+  }
+  async function manualPick(raw) {
+    const v = (raw || "").trim();
+    if (!v) return;
+    try {
+      const r = await fetch(BRIDGE + "/list-dir?path=" + encodeURIComponent(v));
+      const d = await r.json();
+      if (!d.ok) { dpState.error = d.error || "目录无效"; renderDirPicker(); return; }
+      commitDir({ path: d.path, label: shortenPath(d.path), isGit: !!d.isGitRepo });
+    } catch (_) { dpState.error = "无法连接 Bridge"; renderDirPicker(); }
+  }
+
+  // --- 手动输入框：联想下拉 + Tab 补全（数据源同为 /list-dir）---
+  let dpSugItems = [], dpSugActive = -1, dpSugTimer = null;
+  function dpSplitPath(v) {
+    const slash = v.lastIndexOf("/");
+    if (slash < 0) return { dir: v, prefix: "" };
+    return { dir: v.slice(0, slash) || "/", prefix: v.slice(slash + 1) };
+  }
+  function dpJoin(dir, name) { return (dir.endsWith("/") ? dir : dir + "/") + name; }
+  function dpCommonPrefix(names) {
+    if (!names.length) return "";
+    let p = names[0];
+    for (const n of names) { let i = 0; while (i < p.length && i < n.length && p[i].toLowerCase() === n[i].toLowerCase()) i++; p = p.slice(0, i); }
+    return p;
+  }
+  async function dpFetchEntries(dir) {
+    try { const r = await fetch(BRIDGE + "/list-dir?path=" + encodeURIComponent(dir)); const d = await r.json(); return d.ok ? (d.entries || []) : []; } catch (_) { return []; }
+  }
+  function dpRenderSug() {
+    const sug = dirPickerEl.querySelector(".cc-dp-suggest");
+    if (!sug) return;
+    if (!dpSugItems.length) { sug.innerHTML = ""; sug.style.display = "none"; return; }
+    sug.style.display = "block";
+    sug.innerHTML = dpSugItems.map((e, i) => `<div class="cc-dp-sug${i === dpSugActive ? " cc-dp-sug-on" : ""}" data-i="${i}"><span class="cc-dp-sug-ico">${e.isGit ? `<span class="cc-git-badge">git</span>` : ICON.folder}</span><span class="cc-dp-sug-name">${esc(e.name)}</span></div>`).join("");
+    sug.querySelectorAll(".cc-dp-sug").forEach(el => el.addEventListener("mousedown", (ev) => { ev.preventDefault(); dpApplySug(dpSugItems[+el.dataset.i]); }));
+    if (dpSugActive >= 0) { const on = sug.querySelector(".cc-dp-sug-on"); if (on) on.scrollIntoView({ block: "nearest" }); }
+  }
+  function dpApplySug(item) {
+    const inp = dirPickerEl.querySelector(".cc-dp-input");
+    if (!inp || !item) return;
+    inp.value = item.path + "/";
+    dpSugItems = []; dpSugActive = -1; dpRenderSug(); inp.focus(); dpUpdateSug();
+  }
+  async function dpUpdateSug() {
+    const inp = dirPickerEl.querySelector(".cc-dp-input");
+    if (!inp) return;
+    const v = inp.value.trim();
+    if (!v || !(v.startsWith("/") || v.startsWith("~"))) { dpSugItems = []; dpSugActive = -1; dpRenderSug(); return; }
+    const { dir, prefix } = dpSplitPath(v);
+    const entries = await dpFetchEntries(dir);
+    const pl = prefix.toLowerCase();
+    dpSugItems = entries.filter(e => e.name.toLowerCase().startsWith(pl)).slice(0, 50);
+    dpSugActive = -1; dpRenderSug();
+  }
+  async function dpTabComplete() {
+    const inp = dirPickerEl.querySelector(".cc-dp-input");
+    if (!inp) return;
+    const v = inp.value.trim();
+    if (!v || !(v.startsWith("/") || v.startsWith("~"))) return;
+    const { dir, prefix } = dpSplitPath(v);
+    const entries = await dpFetchEntries(dir);
+    const matches = entries.filter(e => e.name.toLowerCase().startsWith(prefix.toLowerCase()));
+    if (!matches.length) return;
+    if (matches.length === 1) { inp.value = matches[0].path + "/"; dpSugItems = []; dpSugActive = -1; dpRenderSug(); dpUpdateSug(); return; }
+    const cp = dpCommonPrefix(matches.map(e => e.name));
+    if (cp.length > prefix.length) inp.value = dpJoin(dir, cp);
+    dpSugItems = matches.slice(0, 50); dpSugActive = -1; dpRenderSug();
+  }
+
+  function renderDirPicker() {
+    const s = dpState;
+    let html = `<div class="cc-dp-box"><div class="cc-dp-head"><span class="cc-dp-title">${esc(s.title)}</span><button class="cc-dp-close" title="关闭">×</button></div>`;
+    html += `<div class="cc-dp-bar">`;
+    html += s.parent ? `<button class="cc-dp-up" data-up="${esc(s.parent)}">↑ 上一级</button>` : `<span class="cc-dp-up cc-dp-up-off">↑</span>`;
+    html += `<span class="cc-dp-cwd" title="${esc(s.path || "")}">${esc(s.path ? shortenPath(s.path) : "…")}</span>`;
+    if (s.path) html += `<button class="cc-dp-use" data-use="${esc(s.path)}">${s.mode === "root" ? "在此启动 ✓" : "选用 ✓"}</button>`;
+    html += `</div><div class="cc-dp-scroll">`;
+    // 「最近使用」只在初始（家目录）那一屏显示；一旦点进子目录就隐藏，避免浏览时占位
+    if (s.recents.length && s.path && s.path === s.home) {
+      html += `<div class="cc-dp-section">最近使用</div>`;
+      for (const d of s.recents) {
+        html += `<div class="cc-dp-row" data-pick="${esc(d.path)}"><span class="cc-dp-ico">${d.isGit ? `<span class="cc-git-badge">git</span>` : ICON.folder}</span><span class="cc-dp-name">${esc(d.label || shortenPath(d.path))}</span><button class="cc-dp-rowbtn" data-pick="${esc(d.path)}">选定</button></div>`;
+      }
+    }
+    html += `<div class="cc-dp-section">${s.path ? esc(shortenPath(s.path)) + " 内" : "子目录"}</div>`;
+    if (s.loading) html += `<div class="cc-dp-msg">加载中…</div>`;
+    else if (s.error) html += `<div class="cc-dp-msg cc-dp-msg-err">${esc(s.error)}</div>`;
+    else if (!s.entries.length) html += `<div class="cc-dp-msg">（没有子目录）</div>`;
+    else for (const e of s.entries) {
+      html += `<div class="cc-dp-row" data-enter="${esc(e.path)}"><span class="cc-dp-ico">${e.isGit ? `<span class="cc-git-badge">git</span>` : ICON.folder}</span><span class="cc-dp-name">${esc(e.name)}</span><button class="cc-dp-rowbtn" data-pick="${esc(e.path)}">选定</button></div>`;
+    }
+    html += `</div><div class="cc-dp-manual"><div class="cc-dp-suggest"></div><input class="cc-dp-input" placeholder="输入绝对路径：Tab 补全 · ↑↓ 选择 · 回车确认" autocomplete="off" spellcheck="false" /></div></div>`;
+    dirPickerEl.innerHTML = html;
+
+    dirPickerEl.querySelector(".cc-dp-close").addEventListener("click", closeDirPicker);
+    const up = dirPickerEl.querySelector(".cc-dp-up[data-up]");
+    if (up) up.addEventListener("click", () => browseDir(up.dataset.up));
+    const use = dirPickerEl.querySelector(".cc-dp-use");
+    if (use) use.addEventListener("click", () => commitDir({ path: use.dataset.use, label: shortenPath(use.dataset.use), isGit: s.isGitRepo }));
+    dirPickerEl.querySelectorAll(".cc-dp-row").forEach(row => {
+      row.addEventListener("click", (e) => {
+        if (e.target.closest(".cc-dp-rowbtn")) return;
+        if (row.dataset.enter) browseDir(row.dataset.enter);
+        else if (row.dataset.pick) commitDir({ path: row.dataset.pick, label: shortenPath(row.dataset.pick), isGit: rowIsGit(row.dataset.pick) });
+      });
+    });
+    dirPickerEl.querySelectorAll(".cc-dp-rowbtn").forEach(btn => {
+      btn.addEventListener("click", (e) => { e.stopPropagation(); commitDir({ path: btn.dataset.pick, label: shortenPath(btn.dataset.pick), isGit: rowIsGit(btn.dataset.pick) }); });
+    });
+    const inp = dirPickerEl.querySelector(".cc-dp-input");
+    if (inp) {
+      inp.addEventListener("input", () => { clearTimeout(dpSugTimer); dpSugTimer = setTimeout(dpUpdateSug, 180); });
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Tab") { e.preventDefault(); dpTabComplete(); return; }
+        if (e.key === "ArrowDown" && dpSugItems.length) { e.preventDefault(); dpSugActive = Math.min(dpSugActive + 1, dpSugItems.length - 1); dpRenderSug(); return; }
+        if (e.key === "ArrowUp" && dpSugItems.length) { e.preventDefault(); dpSugActive = Math.max(dpSugActive - 1, -1); dpRenderSug(); return; }
+        if (e.key === "Enter") { e.preventDefault(); if (dpSugActive >= 0 && dpSugItems[dpSugActive]) dpApplySug(dpSugItems[dpSugActive]); else manualPick(inp.value); return; }
+        if (e.key === "Escape" && dpSugItems.length) { e.stopPropagation(); dpSugItems = []; dpSugActive = -1; dpRenderSug(); }
+      });
+      inp.addEventListener("blur", () => setTimeout(() => { dpSugItems = []; dpSugActive = -1; dpRenderSug(); }, 150));
+    }
+  }
+
+  // --- ① 会话根目录：入口/已选 chip 放在新建会话的欢迎页中央 ---
+  function renderWelcomeDir(conv) {
+    if (!conv) return;
+    const el = conv.container.querySelector(".cc-welcome-dir");
+    if (!el) return; // 欢迎页已被对话内容替换
+    el.innerHTML = "";
+    if (conv.engineCwd) {
+      const chip = document.createElement("div");
+      chip.className = "cc-dir-chip cc-dir-root";
+      chip.innerHTML = `<span class="cc-dir-role">工作目录</span><span class="cc-dir-name" title="${esc(conv.engineCwd)}">${esc(basename(conv.engineCwd))}</span><button class="cc-dir-rm" title="取消">×</button>`;
+      chip.querySelector(".cc-dir-rm").addEventListener("click", () => { conv.engineCwd = null; persistIndex(); renderLinkedDirs(); });
+      el.appendChild(chip);
+    } else {
+      const btn = document.createElement("button");
+      btn.className = "cc-dir-rootbtn";
+      btn.innerHTML = `${ICON.folder} 选择工作目录，在此启动 Claude Code`;
+      btn.addEventListener("click", () => openDirPicker({ mode: "root", title: "选择会话根目录（在此启动 Claude Code）", onPick: (d) => { conv.engineCwd = d.path; persistIndex(); renderLinkedDirs(); } }));
+      el.appendChild(btn);
+    }
+  }
+
+  // --- 输入区：会话激活后只显示 ② 附加参考目录（① 工作目录已移到标题栏）---
+  function renderLinkedDirs() {
+    const conv = activeConv();
+    renderWelcomeDir(conv);
+    renderHeaderTitle();
+    linkedDirsEl.innerHTML = "";
+    attachDirsEl.innerHTML = "";
+    if (!conv) return;
+    const active = !!conv.engineSessionId || isStreaming;
+    if (!active) return; // 会话开始前，根目录入口在欢迎页，输入区保持干净
+
+    // ① 工作目录已上移到标题栏（renderHeaderTitle），输入区只保留参考目录
+    // ② 附加参考目录
+    (conv.refDirs || []).forEach((d, i) => {
+      const chip = document.createElement("div");
+      chip.className = "cc-dir-chip cc-dir-ref";
+      chip.innerHTML = `<span class="cc-dir-role">参考</span><span class="cc-dir-name" title="${esc(d.path)}">${esc(basename(d.path))}</span>${d.isGit ? `<span class="cc-git-badge">git</span>` : ""}<button class="cc-dir-rm" title="移除">×</button>`;
+      chip.querySelector(".cc-dir-rm").addEventListener("click", () => { conv.refDirs.splice(i, 1); persistIndex(); renderLinkedDirs(); });
+      linkedDirsEl.appendChild(chip);
+    });
+    const addBtn = document.createElement("button");
+    addBtn.className = "cc-link-toggle cc-dir-addref";
+    addBtn.innerHTML = `${ICON.link} 关联目录`;
+    addBtn.addEventListener("click", () => openDirPicker({ mode: "ref", title: "关联参考目录（只读背景资料）", onPick: (d) => {
+      if (!conv.refDirs) conv.refDirs = [];
+      if (conv.engineCwd === d.path) return;
+      if (!conv.refDirs.some(x => x.path === d.path)) conv.refDirs.push(d);
+      persistIndex(); renderLinkedDirs();
+    } }));
+    attachDirsEl.appendChild(addBtn);
+  }
+  renderLinkedDirs();
+
+  // ========== IMAGE ATTACHMENTS ==========
+  const imgBtn = panel.querySelector(".cc-img-btn");
+  const imgPreviewsEl = panel.querySelector(".cc-image-previews");
+  const MAX_IMAGES = 5;
+  const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+  function addImage(file) {
+    if (pendingImages.length >= MAX_IMAGES) return;
+    if (file.size > MAX_IMAGE_SIZE) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      pendingImages.push({
+        data: reader.result.split(",")[1],
+        name: file.name || "image." + (file.type.split("/")[1] || "png"),
+        type: file.type || "image/png",
+      });
+      renderImagePreviews();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function renderImagePreviews() {
+    imgPreviewsEl.innerHTML = "";
+    if (pendingImages.length === 0) { imgPreviewsEl.style.display = "none"; return; }
+    imgPreviewsEl.style.display = "flex";
+    pendingImages.forEach((img, i) => {
+      const thumb = document.createElement("div");
+      thumb.className = "cc-img-thumb";
+      thumb.innerHTML = `<img src="data:${img.type};base64,${img.data}" /><button class="cc-img-rm">×</button>`;
+      thumb.querySelector(".cc-img-rm").addEventListener("click", () => {
+        pendingImages.splice(i, 1);
+        renderImagePreviews();
+      });
+      imgPreviewsEl.appendChild(thumb);
+    });
+  }
+
+  imgBtn.addEventListener("click", () => {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "image/*"; inp.multiple = true;
+    inp.addEventListener("change", () => { for (const f of inp.files) addImage(f); });
+    inp.click();
+  });
+
+  inputEl.addEventListener("paste", (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) addImage(file);
+        return;
+      }
+    }
+  });
+
+  const inputWrapperEl = panel.querySelector(".cc-input-wrapper");
+  inputWrapperEl.addEventListener("dragover", (e) => { e.preventDefault(); inputWrapperEl.classList.add("cc-drag-over"); });
+  inputWrapperEl.addEventListener("dragleave", () => { inputWrapperEl.classList.remove("cc-drag-over"); });
+  inputWrapperEl.addEventListener("drop", (e) => {
+    e.preventDefault(); inputWrapperEl.classList.remove("cc-drag-over");
+    for (const file of e.dataTransfer.files) {
+      if (file.type.startsWith("image/")) addImage(file);
+    }
+  });
+
   // ========== HEALTH ==========
   async function checkHealth() { try { const r = await fetch(BRIDGE + "/health", { signal: AbortSignal.timeout(3000) }); bridgeOnline = !!(await r.json()).ok; } catch (_) { bridgeOnline = false; } statusDot.className = "cc-status-dot " + (bridgeOnline ? "cc-online" : "cc-offline"); try { if (window.parent !== window) window.parent.postMessage({ type: "__CC_HEALTH__", online: bridgeOnline }, "*"); } catch(_) {} }
 
   // ========== HELPERS ==========
-  function getWelcomeHTML() { const t = (ENGINE_META[currentEngine] || {}).title || "Claude Code"; return `<div class="cc-welcome"><div class="cc-welcome-title">${t}</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-shortcuts"><span><kbd>${MOD_KEY}</kbd>+<kbd>J</kbd> 打开</span><span><kbd>↵</kbd> 发送</span></div></div>`; }
+  function getWelcomeHTML() { const t = (ENGINE_META[currentEngine] || {}).title || "Claude Code"; return `<div class="cc-welcome"><div class="cc-welcome-title">${t}</div><div class="cc-welcome-hint">选中文档中的文字，然后告诉我你想做什么。</div><div class="cc-welcome-dir"></div><div class="cc-welcome-shortcuts"><span><kbd>${MOD_KEY}</kbd>+<kbd>J</kbd> 打开</span><span><kbd>↵</kbd> 发送</span></div></div>`; }
 
-  function addUserMsg(container, text) {
+  function addUserMsg(container, text, images) {
     const w = container.querySelector(".cc-welcome"); if (w) w.remove();
+    const sn = container.querySelector(".cc-switch-notice"); if (sn) sn.remove();
     const m = document.createElement("div"); m.className = "cc-msg cc-msg-user";
-    m.innerHTML = `<div class="cc-msg-body">${esc(text)}</div>`;
+    let imgHtml = "";
+    if (images && images.length > 0) {
+      imgHtml = `<div class="cc-msg-images">${images.map(img => `<img class="cc-msg-img" src="data:${img.type};base64,${img.data}" />`).join("")}</div>`;
+    }
+    m.innerHTML = `<div class="cc-msg-body">${imgHtml}${esc(text)}</div>`;
     container.appendChild(m);
   }
 
@@ -676,22 +1039,26 @@ if (window.top === window) {
   // ========== SEND ==========
   async function send() {
     if (isStreaming) return;
-    const text = inputEl.value.trim(); if (!text) return;
+    const text = inputEl.value.trim(); if (!text && pendingImages.length === 0) return;
     const selection = await waitForSelection();
 
     // Ensure conversation exists
     if (!activeConvId || !activeConv()) newConversation();
     const conv = activeConv();
-    if (conv.title === "新会话") { conv.title = text.length > 30 ? text.slice(0, 30) + "…" : text; }
+    if (conv.title === "新会话") { const t = text || "图片问答"; conv.title = t.length > 30 ? t.slice(0, 30) + "…" : t; }
 
     const targetConvId = conv.id;
     const container = conv.container;
     const needsFork = conv.isImported && conv.engine === "claude" && !!conv.engineSessionId;
 
-    inputHistory.unshift(text); if (inputHistory.length > 20) inputHistory.pop(); historyIdx = -1;
+    if (text) { inputHistory.unshift(text); if (inputHistory.length > 20) inputHistory.pop(); }
+    historyIdx = -1;
+    const sentImages = [...pendingImages];
+    pendingImages = []; renderImagePreviews();
 
     isStreaming = true; sendBtn.disabled = true; stopBtn.classList.add("cc-active"); fab.classList.add("cc-streaming");
-    addUserMsg(container, text);
+    renderLinkedDirs(); // 发送即锁定根目录 chip
+    addUserMsg(container, text || (sentImages.length > 0 ? "[图片]" : ""), sentImages);
     const { activityEl, replyEl, actionsEl } = addAssistantMsg(container);
     inputEl.value = ""; inputEl.style.height = "auto";
     scrollContainer(container);
@@ -727,7 +1094,7 @@ if (window.top === window) {
 
     function handleEvent(ev) {
       switch (ev.type) {
-        case "engine_session": { const c = getConv(targetConvId); if (c) { c.engineSessionId = ev.engineSessionId; c.isImported = false; } LOG("engine session:", ev.engineSessionId); break; }
+        case "engine_session": { const c = getConv(targetConvId); if (c) { c.engineSessionId = ev.engineSessionId; c.isImported = false; } if (targetConvId === activeConvId) renderLinkedDirs(); LOG("engine session:", ev.engineSessionId); break; }
         case "status": updateStatus(activityEl, ev.message); break;
         case "thinking_start": clearSteps(activityEl, "status"); if (!activityEl.querySelector('.cc-step[data-type="thinking"]')) addStep(activityEl, "thinking", "思考中…"); break;
         case "thinking": break;
@@ -773,7 +1140,7 @@ if (window.top === window) {
     try {
       const startRes = await fetch(BRIDGE + "/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request: text, engine: conv.engine || "claude", engineSessionId: conv.engineSessionId, engineCwd: conv.engineCwd, forkSession: needsFork, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, cursorPos: { from: cachedCursorFrom, to: cachedCursorTo, context: cachedCursorCtx } }),
+        body: JSON.stringify({ request: text || "请分析图片内容", engine: conv.engine || "claude", engineSessionId: conv.engineSessionId, engineCwd: conv.engineCwd, refDirs: (conv.refDirs || []).map(d => d.path), forkSession: needsFork, url: getDocUrl(), title: getDocTitle(), selection, linkedDocs, cursorPos: { from: cachedCursorFrom, to: cachedCursorTo, context: cachedCursorCtx }, images: sentImages.length > 0 ? sentImages : undefined }),
       });
       const d = await startRes.json(); if (!d.ok) throw new Error(d.error || "启动失败");
       sessionId = d.sessionId; LOG("session:", sessionId);
@@ -841,6 +1208,7 @@ if (window.top === window) {
       if (renderFrame) cancelAnimationFrame(renderFrame);
       isStreaming = false; sendBtn.disabled = false; stopBtn.classList.remove("cc-active"); fab.classList.remove("cc-streaming"); abortController = null;
       persistIndex();
+      renderLinkedDirs();
     }
   }
 

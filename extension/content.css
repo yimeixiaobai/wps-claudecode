@@ -256,12 +256,18 @@
   display: flex;
   align-items: center;
   gap: 7px;
+  min-width: 0;
   color: var(--cc-text-primary);
   letter-spacing: -0.01em;
 }
-.cc-title svg { width: 14px; height: 14px; color: var(--cc-ember); }
+.cc-title svg { width: 14px; height: 14px; color: var(--cc-ember); flex-shrink: 0; }
+.cc-title-dir {
+  min-width: 0; max-width: 160px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: var(--cc-mono); font-weight: 600;
+}
 
-.cc-header-actions { display: flex; align-items: center; gap: 2px; }
+.cc-header-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
 .cc-header-btn {
   background: none;
   border: none;
@@ -527,6 +533,11 @@
   font-size: 10px;
   color: var(--cc-text-muted);
 }
+.cc-welcome-dir { display: flex; justify-content: center; margin-top: 2px; }
+.cc-welcome-dir:empty { display: none; }
+.cc-welcome-dir .cc-dir-rootbtn { font-size: 12px; padding: 6px 14px; }
+.cc-welcome-dir .cc-dir-chip { font-size: 12px; padding: 5px 10px; margin-bottom: 0; }
+.cc-welcome-dir .cc-dir-name { flex: 0 1 auto; max-width: 200px; }
 
 /* ────────────────── BUBBLES ────────────────── */
 .cc-msg {
@@ -972,7 +983,12 @@
 }
 
 /* ────────────────── LINKED DOCS ────────────────── */
+/* 关联文档 / 关联目录 两个按钮并排成一行工具条；各自的内容落到下方 */
+.cc-attach-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-bottom: 6px; }
+.cc-attach-docs, .cc-attach-dirs { display: inline-flex; }
+.cc-attach-dirs:empty { display: none; }
 .cc-linked-docs { padding-bottom: 6px; }
+.cc-linked-docs:empty { display: none; padding-bottom: 0; }
 .cc-link-header {
   display: flex; align-items: center; gap: 4px;
   font-size: 10px; color: var(--cc-text-ghost); margin-bottom: 3px;
@@ -1068,6 +1084,171 @@
 .cc-link-result-meta {
   font-size: 10px; color: var(--cc-text-ghost);
   flex-shrink: 0; margin-left: 8px;
+}
+
+/* ────────────────── LINKED DIRS (① root / ② ref) ────────────────── */
+.cc-linked-dirs { padding-bottom: 6px; }
+.cc-linked-dirs:empty { display: none; padding-bottom: 0; }
+
+.cc-dir-rootbtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--cc-ember-dim);
+  border: 1px dashed var(--cc-ember);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-family: var(--cc-font); font-size: 12px;
+  color: var(--cc-ember); cursor: pointer;
+  transition: background 0.12s;
+}
+.cc-dir-rootbtn:hover { background: var(--cc-ember-glow); }
+.cc-dir-rootbtn svg { width: 13px; height: 13px; }
+
+/* 目录 chip：对齐「关联文档」——左侧色条 + 角色文字 + 目录名为主 */
+.cc-dir-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 8px; border-radius: 4px; margin-bottom: 3px; font-size: 11px;
+}
+.cc-dir-chip:last-child { margin-bottom: 0; }
+.cc-dir-root { background: var(--cc-ember-dim); border-left: 2px solid var(--cc-ember); }
+.cc-dir-ref  { background: var(--cc-surface-2); border-left: 2px solid var(--cc-surface-4); }
+.cc-dir-role { flex-shrink: 0; font-size: 10px; color: var(--cc-text-muted); }
+.cc-dir-root .cc-dir-role { color: var(--cc-ember); }
+.cc-dir-name {
+  flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: var(--cc-mono); font-size: 11px; font-weight: 600;
+  color: var(--cc-text-primary);
+}
+.cc-dir-lock { flex-shrink: 0; font-size: 10px; opacity: 0.7; }
+.cc-dir-rm {
+  flex-shrink: 0; background: none; border: none;
+  color: var(--cc-text-ghost); font-size: 14px; line-height: 1;
+  cursor: pointer; padding: 0 2px;
+}
+.cc-dir-rm:hover { color: var(--cc-error); }
+
+.cc-git-badge {
+  display: inline-block;
+  font-family: var(--cc-mono); font-size: 9px; line-height: 1.5;
+  padding: 0 4px; border-radius: 3px;
+  background: var(--cc-ember); color: #fff;
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
+
+/* Directory picker overlay */
+.cc-dir-picker {
+  display: none;
+  position: absolute; inset: 0; z-index: 30;
+  background: rgba(0, 0, 0, 0.28);
+  align-items: center; justify-content: center;
+  padding: 16px;
+}
+.cc-dir-picker.cc-dp-visible { display: flex; }
+.cc-dp-box {
+  width: 100%; max-width: 380px; max-height: 88%;
+  display: flex; flex-direction: column;
+  background: var(--cc-surface-1);
+  border: 1px solid var(--cc-surface-3);
+  border-radius: var(--cc-r-sm);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+.cc-dp-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-bottom: 1px solid var(--cc-surface-3);
+}
+.cc-dp-title { font-size: 12px; font-weight: 600; color: var(--cc-text-primary); }
+.cc-dp-close {
+  background: none; border: none; color: var(--cc-text-muted);
+  font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px;
+}
+.cc-dp-close:hover { color: var(--cc-text-primary); }
+.cc-dp-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px; border-bottom: 1px solid var(--cc-surface-3);
+  background: var(--cc-surface-0);
+}
+.cc-dp-up {
+  flex-shrink: 0;
+  background: var(--cc-surface-2); border: 1px solid var(--cc-surface-3);
+  border-radius: 5px; padding: 2px 8px;
+  font-size: 11px; color: var(--cc-text-secondary); cursor: pointer;
+}
+.cc-dp-up:hover { border-color: var(--cc-ember); color: var(--cc-ember); }
+.cc-dp-up-off { opacity: 0.35; cursor: default; }
+.cc-dp-cwd {
+  flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  direction: rtl; text-align: left;
+  font-family: var(--cc-mono); font-size: 10px; color: var(--cc-text-muted);
+}
+.cc-dp-use {
+  flex-shrink: 0;
+  background: var(--cc-ember); border: none; color: #fff;
+  border-radius: 5px; padding: 3px 9px;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+}
+.cc-dp-use:hover { background: var(--cc-ember-hover); }
+.cc-dp-scroll { flex: 1; overflow-y: auto; min-height: 80px; }
+.cc-dp-section {
+  padding: 6px 12px 3px;
+  font-size: 10px; color: var(--cc-text-ghost);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  position: sticky; top: 0; background: var(--cc-surface-1);
+}
+.cc-dp-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 12px; cursor: pointer; transition: background 0.1s;
+}
+.cc-dp-row:hover { background: var(--cc-surface-2); }
+.cc-dp-ico { flex-shrink: 0; min-width: 28px; display: inline-flex; align-items: center; color: var(--cc-text-muted); }
+.cc-dp-ico svg { width: 15px; height: 15px; }
+.cc-dp-name {
+  flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 12px; color: var(--cc-text-primary);
+}
+.cc-dp-rowbtn {
+  flex-shrink: 0;
+  background: none; border: 1px solid var(--cc-surface-4);
+  border-radius: 5px; padding: 2px 8px;
+  font-size: 10px; color: var(--cc-text-muted); cursor: pointer;
+  transition: border-color 0.1s, color 0.1s;
+}
+.cc-dp-rowbtn:hover { border-color: var(--cc-ember); color: var(--cc-ember); }
+.cc-dp-msg { padding: 12px; text-align: center; font-size: 11px; color: var(--cc-text-ghost); }
+.cc-dp-msg-err { color: var(--cc-error); }
+.cc-dp-manual {
+  position: relative;
+  padding: 8px 12px; border-top: 1px solid var(--cc-surface-3);
+  background: var(--cc-surface-0);
+}
+.cc-dp-input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid var(--cc-surface-3); border-radius: 6px;
+  padding: 5px 9px;
+  font-family: var(--cc-mono); font-size: 11px;
+  color: var(--cc-text-primary); background: var(--cc-surface-1);
+  outline: none; transition: border-color 0.12s;
+}
+.cc-dp-input:focus { border-color: var(--cc-ember); }
+.cc-dp-input::placeholder { color: var(--cc-text-ghost); font-family: var(--cc-font); }
+.cc-dp-suggest {
+  display: none;
+  position: absolute; left: 12px; right: 12px; bottom: calc(100% - 4px);
+  max-height: 190px; overflow-y: auto;
+  background: var(--cc-surface-1);
+  border: 1px solid var(--cc-surface-3); border-radius: 6px;
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.18);
+  z-index: 5;
+}
+.cc-dp-sug { display: flex; align-items: center; gap: 7px; padding: 5px 10px; cursor: pointer; }
+.cc-dp-sug:hover, .cc-dp-sug-on { background: var(--cc-surface-2); }
+.cc-dp-sug-ico { flex-shrink: 0; min-width: 22px; display: inline-flex; align-items: center; color: var(--cc-text-muted); }
+.cc-dp-sug-ico svg { width: 14px; height: 14px; }
+.cc-dp-sug-name {
+  flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 12px; color: var(--cc-text-primary); font-family: var(--cc-mono);
 }
 
 /* ────────────────── MARKDOWN ────────────────── */
